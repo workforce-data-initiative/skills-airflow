@@ -1,31 +1,42 @@
 """Ingest job listing data from partners, converting into common schema"""
-from datetime import datetime
+from skills_ml.datasets.raw_job_postings import importers
+try:
+    from dags.private import importers as private_importers
+    importers.update(private_importers)
+except ImportError:
+    pass
 
-from airflow import DAG
-from airflow.operators import BaseOperator
+from skills_utils.s3 import split_s3_path
 
-default_args = {
-    'depends_on_past': False,
-    'start_date': datetime(2011, 1, 1),
-}
+from config import config
+from operators.partner_etl import PartnerETLOperator
+from utils.dags import QuarterlySubDAG
 
 
 def define_partner_etl(main_dag_name):
-    dag = DAG(
-        '{}.partner_etl'.format(main_dag_name),
-        schedule_interval='0 0 1 */3 *',
-        default_args=default_args
-    )
+    dag = QuarterlySubDAG(main_dag_name, 'partner_etl')
 
-    class Virginia(BaseOperator):
-        def execute(self, context):
-            pass
+    raw_jobs = config.get('raw_jobs_s3_paths', {})
+    if not raw_jobs:
+        return dag
+    bucket, prefix = split_s3_path(config['job_postings']['s3_path'])
 
-    class CareerBuilder(BaseOperator):
-        def execute(self, context):
-            pass
+    for partner_id, s3_path in raw_jobs.items():
+        importer_class = importers[partner_id]
 
-    va = Virginia(task_id='va', dag=dag)
-    cb = CareerBuilder(task_id='cb', dag=dag)
+        input_bucket, input_prefix = split_s3_path(s3_path)
+
+        PartnerETLOperator(
+            task_id=partner_id,
+            dag=dag,
+            transformer_class=importer_class,
+            output_bucket=bucket,
+            output_prefix=prefix,
+            partner_id=partner_id,
+            passthrough_kwargs={
+                'bucket_name': input_bucket,
+                'prefix': input_prefix,
+            }
+        )
 
     return dag

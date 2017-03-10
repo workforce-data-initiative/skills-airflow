@@ -5,7 +5,7 @@ from sqlalchemy.orm import sessionmaker
 from sqlalchemy import create_engine
 from airflow import models
 from mock import patch
-from dags.api_sync_v1 import define_api_sync
+from dags.open_skills_master import api_sync_dag
 from skills_ml.api_sync.v1.models import JobMaster,\
     SkillMaster,\
     SkillImportance,\
@@ -19,7 +19,7 @@ configuration.test_mode()
 
 
 def test_dag():
-    dag = define_api_sync('open_skills_master')
+    dag = api_sync_dag
     with testing.postgresql.Postgresql() as postgresql:
         configuration.test_mode()
 
