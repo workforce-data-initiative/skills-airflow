@@ -1,0 +1,15 @@
+dist: trusty
+language: python
+python: 3.4
+env:
+- BOTO_CONFIG=/tmp/nowhere PYTHONPATH='.'
+before_install:
+- sudo apt-get update
+install:
+- pip install -r requirements.txt
+- pip install -r requirements_dev.txt
+before_script:
+- airflow initdb
+- sed -i 's/\/home\/travis\/airflow\/dags/\/home\/travis\/build\/workforce-data-initiative\/skills-airflow\/dags/g' /home/travis/airflow/airflow.cfg
+script: py.test -vvv -s --cov=dags
+after_success: codecov
