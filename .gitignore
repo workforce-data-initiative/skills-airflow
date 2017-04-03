@@ -78,6 +78,9 @@ celerybeat-schedule
 # dotenv
 .env
 
+# vim
+*.swp
+
 # virtualenv
 venv/
 ENV/
@@ -87,3 +90,20 @@ ENV/
 
 # Rope project settings
 .ropeproject
+
+# tmp directory for downloaded files
+tmp/*
+!tmp/README.md
+
+# config file holding infrastructure information
+config.yaml
+
+# db config file
+api_v1_db.yaml
+
+# Output folder/s3 upload staging area
+output/*
+!output/interesting_job_titles.tsv
+
+# missed test log
+missed.txt
