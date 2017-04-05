@@ -10,4 +10,8 @@ output_tables:
     s3_path: 'output-bucket/tables'
 local_mode: True
 output_folder: 'output'
+raw_jobs_s3_paths:
+    XX: 'some-bucket/jobs/dump/'
+airflow_contacts:
+    - datascifellows@gmail.com
 ...
