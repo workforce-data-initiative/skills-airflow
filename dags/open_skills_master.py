@@ -13,6 +13,7 @@ from dags.job_label import define_job_label
 from dags.job_vectorize import define_job_vectorize
 from dags.skill_tag import define_skill_tag
 from dags.job_title_sample import define_job_title_sample
+from dags.tabular_upload import define_tabular_upload
 
 from config import config
 
@@ -35,6 +36,7 @@ job_label_dag = define_job_label(MAIN_DAG_NAME)
 job_vectorize_dag = define_job_vectorize(MAIN_DAG_NAME)
 skill_tag_dag = define_skill_tag(MAIN_DAG_NAME)
 job_title_sample_dag = define_job_title_sample(MAIN_DAG_NAME)
+tabular_upload_dag = define_tabular_upload(MAIN_DAG_NAME)
 
 dag = DAG(
     dag_id=MAIN_DAG_NAME,
@@ -102,6 +104,12 @@ job_title_sample = SubDagOperator(
     dag=dag,
 )
 
+tabular_upload = SubDagOperator(
+    subdag=tabular_upload_dag,
+    task_id='tabular_upload',
+    dag=dag
+)
+
 partner_etl.set_upstream(partner_update)
 api_sync.set_upstream(title_count)
 api_sync.set_upstream(onet_extract)
@@ -114,3 +122,4 @@ job_vectorize.set_upstream(partner_etl)
 skill_tag.set_upstream(partner_etl)
 skill_tag.set_upstream(onet_extract)
 job_title_sample.set_upstream(title_count)
+tabular_upload.set_upstream(title_count)
