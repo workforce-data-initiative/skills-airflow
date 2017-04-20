@@ -9,13 +9,13 @@ import pandas as pd
 from airflow.hooks import S3Hook
 from airflow.operators import BaseOperator
 
-from skills_ml.utils.airflow import datetime_to_quarter
-from skills_ml.utils.s3 import upload
-from skills_ml.utils.nlp import NLPTransforms
-from skills_ml.utils.fs import check_create_folder
+from skills_utils.time import datetime_to_quarter
+from skills_utils.s3 import upload
+from skills_utils.fs import check_create_folder
 from skills_ml.datasets import job_postings
 from skills_ml.algorithms.aggregators.title import GeoTitleAggregator
 from skills_ml.algorithms.jobtitle_cleaner.clean import JobTitleStringClean, aggregate
+from skills_ml.utils.nlp import NLPTransforms
 from config import config
 
 from utils.dags import QuarterlySubDAG

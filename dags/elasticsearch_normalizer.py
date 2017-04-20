@@ -7,12 +7,13 @@ likely normalized job titles
 from airflow.operators import BaseOperator
 from airflow.hooks import S3Hook
 
-from skills_ml.utils.es import basic_client
-from skills_ml.algorithms.elasticsearch_indexers.normalize_topn import NormalizeTopNIndexer
-from skills_ml.utils.airflow import datetime_to_quarter
-from skills_ml.datasets import job_postings
-from config import config
+from skills_utils.es import basic_client
+from skills_utils.time import datetime_to_quarter
 
+from skills_ml.algorithms.elasticsearch_indexers.normalize_topn import NormalizeTopNIndexer
+from skills_ml.datasets import job_postings
+
+from config import config
 from utils.dags import QuarterlySubDAG
 
 

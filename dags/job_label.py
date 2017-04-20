@@ -7,7 +7,7 @@ from airflow.operators import BaseOperator
 
 from utils.dags import QuarterlySubDAG
 
-from skills_ml.utils.airflow import datetime_to_quarter
+from skills_utils.time import datetime_to_quarter
 from skills_ml.datasets import job_postings
 from skills_ml.algorithms.corpus_creators.basic import JobCategoryCorpusCreator
 
