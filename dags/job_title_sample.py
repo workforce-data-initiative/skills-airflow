@@ -4,8 +4,8 @@ import os
 
 from airflow.operators import BaseOperator
 
-from skills_ml.utils.airflow import datetime_to_quarter
-from skills_ml.utils.fs import check_create_folder
+from skills_utils.time import datetime_to_quarter
+from skills_utils.fs import check_create_folder
 from skills_ml.algorithms.file_sampler import sampler
 from config import config
 

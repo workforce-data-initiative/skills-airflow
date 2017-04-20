@@ -8,9 +8,9 @@ from airflow.operators import BaseOperator
 
 from config import config
 from skills_ml.datasets import OnetCache
-from skills_ml.utils.es import basic_client
-from skills_ml.utils.hash import md5
-from skills_ml.utils.s3 import split_s3_path, upload
+from skills_utils.es import basic_client
+from skills_utils.hash import md5
+from skills_utils.s3 import split_s3_path, upload
 
 from skills_ml.algorithms.skill_extractors.onet_ksas import OnetSkillExtractor
 from skills_ml.algorithms.skill_importance_extractors.onet import OnetSkillImportanceExtractor

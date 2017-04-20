@@ -11,9 +11,9 @@ from airflow.operators import BaseOperator
 
 from config import config
 from skills_ml.datasets import job_postings
-from skills_ml.utils.airflow import datetime_to_quarter
-from skills_ml.utils.s3 import upload
-from skills_ml.utils.hash import md5
+from skills_utils.time import datetime_to_quarter
+from skills_utils.s3 import upload
+from skills_utils.hash import md5
 
 from skills_ml.algorithms.corpus_creators.basic import SimpleCorpusCreator
 from skills_ml.algorithms.skill_taggers.simple import SimpleSkillTagger

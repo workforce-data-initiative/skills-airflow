@@ -96,10 +96,10 @@ tmp/*
 !tmp/README.md
 
 # config file holding infrastructure information
-config.yaml
+config/config.yaml
 
 # db config file
-api_v1_db.yaml
+config/api_v1_db_config.yaml
 
 # Output folder/s3 upload staging area
 output/*
