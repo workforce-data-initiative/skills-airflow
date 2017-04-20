@@ -11,5 +11,5 @@ install:
 before_script:
 - airflow initdb
 - sed -i 's/\/home\/travis\/airflow\/dags/\/home\/travis\/build\/workforce-data-initiative\/skills-airflow\/dags/g' /home/travis/airflow/airflow.cfg
-script: py.test -vvv -s --cov=dags
+script: py.test -vvv -s --cov=dags --cov=api_sync
 after_success: codecov
