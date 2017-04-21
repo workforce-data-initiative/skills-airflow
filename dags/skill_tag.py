@@ -36,7 +36,7 @@ def define_skill_tag(main_dag_name):
             labeled_filename = 'labeled_corpora_a'
             with open(labeled_filename, 'w') as outfile:
                 writer = csv.writer(outfile, delimiter='\t')
-                job_postings_generator = job_postings(conn, quarter)
+                job_postings_generator = job_postings(conn, quarter, config['job_postings']['s3_path'])
                 corpus_generator = SimpleCorpusCreator()\
                     .raw_corpora(job_postings_generator)
                 tagged_document_generator = \
@@ -50,7 +50,7 @@ def define_skill_tag(main_dag_name):
             upload(
                 conn,
                 labeled_filename,
-                '{}/{}'.format(config['labeled_postings'], quarter)
+                '{}/{}'.format(config['labeled_postings']['s3_path'], quarter)
             )
 
     SkillTagOperator(task_id='skill_tag', dag=dag)

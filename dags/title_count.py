@@ -15,7 +15,7 @@ from skills_utils.fs import check_create_folder
 from skills_ml.datasets import job_postings
 from skills_ml.algorithms.aggregators.title import GeoTitleAggregator
 from skills_ml.algorithms.jobtitle_cleaner.clean import JobTitleStringClean, aggregate
-from skills_ml.utils.nlp import NLPTransforms
+from skills_ml.algorithms.string_cleaners import NLPTransforms
 from config import config
 
 from utils.dags import QuarterlySubDAG
@@ -33,12 +33,14 @@ def define_title_counts(main_dag_name):
             s3_conn = S3Hook().get_conn()
             quarter = datetime_to_quarter(context['execution_date'])
 
-            count_filename = '{}/geo_title_count/{}.csv'.format(
+            count_filename = '{}/{}/{}.csv'.format(
                 output_folder,
+                config['output_tables']['geo_title_count_dir'],
                 quarter
             )
-            rollup_filename = '{}/title_count/{}.csv'.format(
+            rollup_filename = '{}/{}/{}.csv'.format(
                 output_folder,
+                config['output_tables']['title_count_dir'],
                 quarter
             )
 
@@ -74,71 +76,121 @@ def define_title_counts(main_dag_name):
                 rollup_counts,
                 quarter,
             )
-            upload(s3_conn, count_filename, config['output_tables']['s3_path'])
-            upload(s3_conn, rollup_filename, config['output_tables']['s3_path'])
+            upload(
+                s3_conn,
+                count_filename,
+                '{}/{}'.format(
+                    config['output_tables']['s3_path'],
+                    config['output_tables']['geo_title_count_dir']
+                )
+            )
+            upload(
+                s3_conn,
+                rollup_filename,
+                '{}/{}'.format(
+                    config['output_tables']['s3_path'],
+                    config['output_tables']['title_count_dir']
+                )
+            )
 
     class JobTitleCleanOperator(BaseOperator):
         def execute(self, context):
             s3_conn = S3Hook().get_conn()
             quarter = datetime_to_quarter(context['execution_date'])
 
-            cleaned_count_filename = '{}/cleaned_geo_title_count/{}.csv'.format(
+            cleaned_count_filename = '{}/{}/{}.csv'.format(
                 output_folder,
+                config['output_tables']['cleaned_geo_title_count_dir'],
                 quarter
             )
 
-            cleaned_rollup_filename = '{}/cleaned_title_count/{}.csv'.format(
+            cleaned_rollup_filename = '{}/{}/{}.csv'.format(
                 output_folder,
+                config['output_tables']['cleaned_title_count_dir'],
                 quarter
             )
 
-            count_filename = '{}/geo_title_count/{}.csv'.format(
+            count_filename = '{}/{}/{}.csv'.format(
                 output_folder,
+                config['output_tables']['geo_title_count_dir'],
                 quarter
             )
 
-            rollup_filename = '{}/title_count/{}.csv'.format(
+            rollup_filename = '{}/{}/{}.csv'.format(
                 output_folder,
+                config['output_tables']['title_count_dir'],
                 quarter
             )
 
-            logging.info('Cleaning and aggregating geo job titles on %s', quarter)
-            geo_title_count_df = pd.read_csv(count_filename, header=None)
-            geo_title_count_df.columns = ['geo', 'title', 'count']
-            cleaned_geo_title_count_df = JobTitleStringClean().clean(geo_title_count_df)
-            agg_cleaned_geo_title_count_df = aggregate(cleaned_geo_title_count_df, ['geo', 'title'])
 
-            logging.info('Cleaning and aggregating job titles on %s', quarter)
-            title_count_df = pd.read_csv(rollup_filename)
-            title_count_df.columns = ['title', 'count']
-            cleaned_title_count_df = JobTitleStringClean().clean(title_count_df)
-            agg_cleaned_title_count_df = aggregate(cleaned_title_count_df, ['title'])
+            if os.stat(count_filename).st_size > 0:
+                logging.info('Cleaning and aggregating geo job titles on %s', quarter)
+                geo_title_count_df = pd.read_csv(count_filename, header=None)
+                geo_title_count_df.columns = ['geo', 'title', 'count']
+                cleaned_geo_title_count_df = JobTitleStringClean().clean(geo_title_count_df)
+                agg_cleaned_geo_title_count_df = aggregate(cleaned_geo_title_count_df, ['geo', 'title'])
 
-            total_counts = 0
-            check_create_folder(cleaned_count_filename)
-            with open(cleaned_count_filename, 'w') as count_file:
-                clean_geo_writer = csv.writer(count_file, delimiter=',')
-                for idx, row in agg_cleaned_geo_title_count_df.iterrows():
-                    total_counts += row['count']
-                    clean_geo_writer.writerow([row['geo'], row['title'], row['count']])
+                total_counts = 0
+                check_create_folder(cleaned_count_filename)
+                with open(cleaned_count_filename, 'w') as count_file:
+                    clean_geo_writer = csv.writer(count_file, delimiter=',')
+                    for idx, row in agg_cleaned_geo_title_count_df.iterrows():
+                        total_counts += row['count']
+                        clean_geo_writer.writerow([row['geo'], row['title'], row['count']])
 
-            rollup_counts = 0
-            check_create_folder(cleaned_rollup_filename)
-            with open(cleaned_rollup_filename, 'w') as count_file:
-                clean_writer = csv.writer(count_file, delimiter=',')
-                for idx, row in agg_cleaned_title_count_df.iterrows():
-                    rollup_counts += row['count']
-                    clean_writer.writerow([row['title'], row['count']])
+                logging.info(
+                    'Found %s geo title rows for %s',
+                    total_counts,
+                    quarter,
+                )
+            else:
+                logging.warning(
+                    'Geo Title Count file %s not found',
+                    count_filename
+                )
+                upload(
+                    s3_conn,
+                    cleaned_count_filename,
+                    '{}/{}'.format(
+                        config['output_tables']['s3_path'],
+                        config['output_tables']['cleaned_geo_title_count_dir']
+                    )
+                )
 
-            logging.info(
-                'Found %s count rows and %s title rollup rows for %s',
-                total_counts,
-                rollup_counts,
-                quarter,
-            )
+            if os.stat(rollup_filename).st_size > 0:
+                logging.info('Cleaning and aggregating job titles on %s', quarter)
+                title_count_df = pd.read_csv(rollup_filename)
+                title_count_df.columns = ['title', 'count']
+                cleaned_title_count_df = JobTitleStringClean().clean(title_count_df)
+                agg_cleaned_title_count_df = aggregate(cleaned_title_count_df, ['title'])
 
-            upload(s3_conn, cleaned_count_filename, config['output_tables']['s3_path'])
-            upload(s3_conn, cleaned_rollup_filename, config['output_tables']['s3_path'])
+                rollup_counts = 0
+                check_create_folder(cleaned_rollup_filename)
+                with open(cleaned_rollup_filename, 'w') as count_file:
+                    clean_writer = csv.writer(count_file, delimiter=',')
+                    for idx, row in agg_cleaned_title_count_df.iterrows():
+                        rollup_counts += row['count']
+                        clean_writer.writerow([row['title'], row['count']])
+
+                logging.info(
+                    'Found %s title rollup rows for %s',
+                    rollup_counts,
+                    quarter,
+                )
+
+            else:
+                logging.warning(
+                    'Job title rollup file %s not found',
+                    rollup_filename
+                )
+                upload(
+                    s3_conn,
+                    cleaned_rollup_filename,
+                    '{}/{}'.format(
+                        config['output_tables']['s3_path'],
+                        config['output_tables']['cleaned_title_count_dir']
+                    )
+                )
 
     jobtitle_clean = JobTitleCleanOperator(task_id='clean_title_count', dag=dag)
     geo_count = GeoTitleCountOperator(task_id='geo_title_count', dag=dag)

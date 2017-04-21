@@ -12,6 +12,7 @@ from skills_utils.time import datetime_to_quarter
 
 from skills_ml.algorithms.elasticsearch_indexers.normalize_topn import NormalizeTopNIndexer
 from skills_ml.datasets import job_postings
+from functools import partial
 
 from config import config
 from utils.dags import QuarterlySubDAG
@@ -26,7 +27,7 @@ def define_normalizer_index(main_dag_name):
             quarter = datetime_to_quarter(context['execution_date'])
             NormalizeTopNIndexer(
                 quarter=quarter,
-                job_postings_generator=job_postings,
+                job_postings_generator=partial(job_postings, s3_path=config['job_postings']['s3_path']),
                 job_titles_index=config['normalizer']['titles_master_index_name'],
                 alias_name=config['normalizer']['es_index_name'],
                 s3_conn=conn,
