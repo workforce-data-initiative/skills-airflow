@@ -64,7 +64,7 @@ class PartnerETLOperator(BaseOperator):
             self.postings_per_file
         ):
             logging.info('Processing new batch')
-            with tempfile.TemporaryFile() as f:
+            with tempfile.TemporaryFile(mode='w+') as f:
                 for posting in batch:
                     f.write(json.dumps(posting))
                     f.write('\n')
@@ -77,5 +77,5 @@ class PartnerETLOperator(BaseOperator):
                                               self.partner_id, uuid.uuid4())
                 )
                 f.seek(0)
-                key.set_contents_from_file(f)
+                key.set_contents_from_string(f.read())
                 logging.debug('Batch upload complete')

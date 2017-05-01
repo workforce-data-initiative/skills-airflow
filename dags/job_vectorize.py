@@ -13,6 +13,8 @@ from skills_ml.algorithms.job_vectorizers.doc2vec_vectorizer import Doc2Vectoriz
 
 from utils.dags import QuarterlySubDAG
 
+from config import config
+
 
 def define_job_vectorize(main_dag_name):
     dag = QuarterlySubDAG(main_dag_name, 'job_vectorize')
@@ -24,10 +26,10 @@ def define_job_vectorize(main_dag_name):
             job_vector_filename = 'tmp/job_features_train_' + quarter + '.csv'
             with open(job_vector_filename, 'w') as outfile:
                 writer = csv.writer(outfile, delimiter=',')
-                job_postings_generator = job_postings(s3_conn, quarter)
+                job_postings_generator = job_postings(s3_conn, quarter, config['job_postings']['s3_path'])
                 corpus_generator = GensimCorpusCreator().array_corpora(job_postings_generator)
                 vectorized_job_generator = Doc2Vectorizer(model_name='gensim_doc2vec',
-                                                          path='skills-private/model_cache/',
+                                                          path=config['job_vectorizer_cache']['s3_path'],
                                                           s3_conn=s3_conn).vectorize(corpus_generator)
                 for vector in vectorized_job_generator:
                     writer.writerow(vector)

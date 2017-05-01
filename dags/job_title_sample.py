@@ -27,13 +27,13 @@ def define_job_title_sample(main_dag_name):
 
             cleaned_count_filename = '{}/{}/{}.csv'.format(
                 output_folder,
-                config.get('cleaned_geo_title_count'),
+                'cleaned_geo_title_count',
                 quarter
             )
 
             cleaned_rollup_filename = '{}/{}/{}.csv'.format(
                 output_folder,
-                config.get('cleaned_title_count'),
+                'cleaned_title_count',
                 quarter
             )
 

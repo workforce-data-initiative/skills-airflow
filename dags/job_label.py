@@ -11,6 +11,8 @@ from skills_utils.time import datetime_to_quarter
 from skills_ml.datasets import job_postings
 from skills_ml.algorithms.corpus_creators.basic import JobCategoryCorpusCreator
 
+from config import config
+
 
 def define_job_label(main_dag_name):
     dag = QuarterlySubDAG(main_dag_name, 'job_label')
@@ -22,7 +24,7 @@ def define_job_label(main_dag_name):
             job_label_filename = 'tmp/job_label_train_'+quarter+'.csv'
             with open(job_label_filename, 'w') as outfile:
                 writer = csv.writer(outfile, delimiter=',')
-                job_postings_generator = job_postings(s3_conn, quarter)
+                job_postings_generator = job_postings(s3_conn, quarter, config['job_postings']['s3_path'])
                 corpus_generator = JobCategoryCorpusCreator().label_corpora(job_postings_generator)
                 for label in corpus_generator:
                     writer.writerow([label])

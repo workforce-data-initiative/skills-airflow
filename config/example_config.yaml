@@ -8,6 +8,10 @@ labeled_postings:
     s3_path: 'postings-bucket/labeled'
 output_tables:
     s3_path: 'output-bucket/tables'
+    geo_title_count_dir: 'geo_title_count'
+    title_count_dir: 'title_count'
+    cleaned_geo_title_count_dir: 'cleaned_geo_title_count'
+    cleaned_title_count_dir: 'cleaned_title_count'
 local_mode: True
 output_folder: 'output'
 raw_jobs_s3_paths:
