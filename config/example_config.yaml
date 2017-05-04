@@ -24,6 +24,9 @@ partner_stats:
     s3_path: 'stats-bucket/partner-etl'
 raw_jobs_s3_paths:
     XX: 'some-bucket/jobs/dump/'
+usa_jobs_credentials:
+    auth_key: 'akey'
+    key_email: 'anemail@email.com'
 airflow_contacts:
     - datascifellows@gmail.com
 ...

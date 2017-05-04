@@ -12,6 +12,7 @@ from config import config
 from operators.partner_etl import PartnerETLOperator,\
     PartnerStatsAggregateOperator,\
     GlobalStatsAggregateOperator
+import logging
 from utils.dags import QuarterlySubDAG
 
 
@@ -25,7 +26,10 @@ def define_partner_etl(main_dag_name):
 
     partner_stats = {}
     for partner_id, s3_path in raw_jobs.items():
-        importer_class = importers[partner_id]
+        importer_class = importers.get(partner_id, None)
+        if not importer_class:
+            logging.warning('Importer for %s not found, skipping', partner_id)
+            continue
 
         input_bucket, input_prefix = split_s3_path(s3_path)
 

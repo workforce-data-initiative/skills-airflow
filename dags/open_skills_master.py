@@ -5,7 +5,8 @@ from airflow import DAG
 from airflow.operators.subdag_operator import SubDagOperator
 from dags.api_sync_v1 import define_api_sync
 from dags.partner_etl import define_partner_etl
-from dags.partner_update import define_partner_update
+from dags.partner_quarterly import define_partner_quarterly
+from dags.partner_nightly import define_partner_nightly
 from dags.onet_extract import define_onet_extract
 from dags.elasticsearch_normalizer import define_normalizer_index
 from dags.title_count import define_title_counts
@@ -29,7 +30,8 @@ MAIN_DAG_NAME = 'open_skills_master'
 
 api_sync_dag = define_api_sync(MAIN_DAG_NAME)
 partner_etl_dag = define_partner_etl(MAIN_DAG_NAME)
-partner_update_dag = define_partner_update(MAIN_DAG_NAME)
+partner_quarterly_dag = define_partner_quarterly(MAIN_DAG_NAME)
+partner_nightly_dag = define_partner_nightly(MAIN_DAG_NAME)
 onet_extract_dag = define_onet_extract(MAIN_DAG_NAME)
 normalizer_index_dag = define_normalizer_index(MAIN_DAG_NAME)
 title_count_dag = define_title_counts(MAIN_DAG_NAME)
@@ -58,9 +60,15 @@ partner_etl = SubDagOperator(
     dag=dag,
 )
 
-partner_update = SubDagOperator(
-    subdag=partner_update_dag,
-    task_id='partner_update',
+partner_quarterly = SubDagOperator(
+    subdag=partner_quarterly_dag,
+    task_id='partner_quarterly',
+    dag=dag,
+)
+
+partner_nightly = SubDagOperator(
+    subdag=partner_nightly_dag,
+    task_id='partner_nightly',
     dag=dag,
 )
 
@@ -118,7 +126,8 @@ tabular_upload = SubDagOperator(
     dag=dag
 )
 
-partner_etl.set_upstream(partner_update)
+partner_etl.set_upstream(partner_quarterly)
+partner_etl.set_upstream(partner_nightly)
 api_sync.set_upstream(title_count)
 api_sync.set_upstream(onet_extract)
 api_sync.set_upstream(normalizer_index)
