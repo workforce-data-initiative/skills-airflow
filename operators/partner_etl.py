@@ -107,7 +107,6 @@ class PartnerStatsAggregateOperator(BaseOperator):
 
 
 class GlobalStatsAggregateOperator(BaseOperator):
-    @apply_defaults
     def execute(self, context):
         conn = S3Hook().get_conn()
         stats_aggregator = GlobalStatsAggregator(s3_conn=conn)
