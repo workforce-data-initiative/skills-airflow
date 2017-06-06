@@ -2,6 +2,8 @@ from airflow.models import BaseOperator
 from airflow.hooks import S3Hook
 from airflow.utils.decorators import apply_defaults
 from skills_ml.datasets.onet_cache import OnetCache
+from skills_ml.algorithms.aggregators.dataset_transform import \
+    DatasetStatsCounter, DatasetStatsAggregator, GlobalStatsAggregator
 from skills_utils.iteration import Batch
 from skills_utils.time import datetime_to_quarter
 import tempfile
@@ -47,6 +49,11 @@ class PartnerETLOperator(BaseOperator):
 
     def execute(self, context):
         conn = S3Hook().get_conn()
+        quarter = datetime_to_quarter(context['execution_date'])
+        stats_counter = DatasetStatsCounter(
+            quarter=quarter,
+            dataset_id=self.partner_id
+        )
         transformer = self.transformer_class(
             s3_conn=conn,
             partner_id=self.partner_id,
@@ -57,10 +64,9 @@ class PartnerETLOperator(BaseOperator):
             ),
             **self.passthrough_kwargs
         )
-        quarter = datetime_to_quarter(context['execution_date'])
         self.clear_old_postings(conn, quarter)
         for batch in Batch(
-            transformer.postings(quarter),
+            transformer.postings(quarter, stats_counter),
             self.postings_per_file
         ):
             logging.info('Processing new batch')
@@ -79,3 +85,30 @@ class PartnerETLOperator(BaseOperator):
                 f.seek(0)
                 key.set_contents_from_string(f.read())
                 logging.debug('Batch upload complete')
+        stats_counter.save(
+            s3_conn=conn,
+            s3_prefix=config['partner_stats']['s3_path']
+        )
+
+
+class PartnerStatsAggregateOperator(BaseOperator):
+    @apply_defaults
+    def __init__(self, partner_id, *args, **kwargs):
+        super(PartnerStatsAggregateOperator, self).__init__(*args, **kwargs)
+        self.partner_id = partner_id
+
+    def execute(self, context):
+        conn = S3Hook().get_conn()
+        stats_aggregator = DatasetStatsAggregator(
+            dataset_id=self.partner_id,
+            s3_conn=conn
+        )
+        stats_aggregator.run(config['partner_stats']['s3_path'])
+
+
+class GlobalStatsAggregateOperator(BaseOperator):
+    @apply_defaults
+    def execute(self, context):
+        conn = S3Hook().get_conn()
+        stats_aggregator = GlobalStatsAggregator(s3_conn=conn)
+        stats_aggregator.run(config['partner_stats']['s3_path'])
