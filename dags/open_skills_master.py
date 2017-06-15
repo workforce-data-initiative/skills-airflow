@@ -9,6 +9,7 @@ from dags.partner_update import define_partner_update
 from dags.onet_extract import define_onet_extract
 from dags.elasticsearch_normalizer import define_normalizer_index
 from dags.title_count import define_title_counts
+from dags.soc_count import define_soc_counts
 from dags.job_label import define_job_label
 from dags.job_vectorize import define_job_vectorize
 from dags.skill_tag import define_skill_tag
@@ -32,6 +33,7 @@ partner_update_dag = define_partner_update(MAIN_DAG_NAME)
 onet_extract_dag = define_onet_extract(MAIN_DAG_NAME)
 normalizer_index_dag = define_normalizer_index(MAIN_DAG_NAME)
 title_count_dag = define_title_counts(MAIN_DAG_NAME)
+soc_count_dag = define_soc_counts(MAIN_DAG_NAME)
 job_label_dag = define_job_label(MAIN_DAG_NAME)
 job_vectorize_dag = define_job_vectorize(MAIN_DAG_NAME)
 skill_tag_dag = define_skill_tag(MAIN_DAG_NAME)
@@ -80,6 +82,12 @@ title_count = SubDagOperator(
     dag=dag,
 )
 
+soc_count = SubDagOperator(
+    subdag=soc_count_dag,
+    task_id='soc_count',
+    dag=dag
+)
+
 job_label = SubDagOperator(
     subdag=job_label_dag,
     task_id='job_label',
@@ -117,6 +125,7 @@ api_sync.set_upstream(normalizer_index)
 normalizer_index.set_upstream(partner_etl)
 normalizer_index.set_upstream(onet_extract)
 title_count.set_upstream(partner_etl)
+soc_count.set_upstream(partner_etl)
 job_label.set_upstream(partner_etl)
 job_vectorize.set_upstream(partner_etl)
 skill_tag.set_upstream(partner_etl)

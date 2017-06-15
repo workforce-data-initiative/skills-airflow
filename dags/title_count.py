@@ -10,7 +10,7 @@ from airflow.operators import BaseOperator
 
 from skills_utils.time import datetime_to_quarter
 from skills_utils.s3 import upload
-from skills_ml.datasets import job_postings
+from skills_ml.datasets.job_postings import job_postings_highmem
 from skills_ml.algorithms.aggregators import\
     CountAggregator, SkillAggregator, SocCodeAggregator
 from skills_ml.algorithms.aggregators.title import GeoTitleAggregator
@@ -47,7 +47,7 @@ def define_title_counts(main_dag_name):
                 quarter
             )
 
-            job_postings_generator = job_postings(
+            job_postings_generator = job_postings_highmem(
                 s3_conn,
                 quarter,
                 config['job_postings']['s3_path']
@@ -69,19 +69,24 @@ def define_title_counts(main_dag_name):
             )
             job_aggregators = OrderedDict()
             job_aggregators['counts'] = CountAggregator()
-            job_aggregators['skills'] = SkillAggregator(
+            job_aggregators['onet_skills'] = SkillAggregator(
                 corpus_creator=corpus_creator,
                 skill_extractor=FreetextSkillExtractor(
                     skills_filename=skills_filename
-                )
+                ),
+                output_count=10
             )
             job_aggregators['soc_code_common'] = SocCodeAggregator(
                 corpus_creator=corpus_creator,
-                occupation_classifier=common_classifier
+                occupation_classifier=common_classifier,
+                output_count=2,
+                output_total=True
             )
             job_aggregators['soc_code_top'] = SocCodeAggregator(
                 corpus_creator=corpus_creator,
-                occupation_classifier=top_classifier
+                occupation_classifier=top_classifier,
+                output_count=2,
+                output_total=True
             )
             aggregator = GeoTitleAggregator(
                 job_aggregators=job_aggregators,
@@ -93,8 +98,8 @@ def define_title_counts(main_dag_name):
 
             logging.info(
                 'Found %s count rows and %s title rollup rows for %s',
-                len(aggregator.group_values.keys()),
-                len(aggregator.rollup.keys()),
+                len(aggregator.job_aggregators[0].group_values.keys()),
+                len(aggregator.job_aggregators[0].rollup.keys()),
                 quarter,
             )
             upload(
@@ -131,7 +136,7 @@ def define_title_counts(main_dag_name):
                 quarter
             )
 
-            job_postings_generator = job_postings(
+            job_postings_generator = job_postings_highmem(
                 s3_conn,
                 quarter,
                 config['job_postings']['s3_path']
@@ -163,15 +168,20 @@ def define_title_counts(main_dag_name):
                 corpus_creator=corpus_creator,
                 skill_extractor=FreetextSkillExtractor(
                     skills_filename=skills_filename
-                )
+                ),
+                output_count=10
             )
             job_aggregators['soc_code_common'] = SocCodeAggregator(
                 corpus_creator=corpus_creator,
-                occupation_classifier=common_classifier
+                occupation_classifier=common_classifier,
+                output_count=2,
+                output_total=True
             )
             job_aggregators['soc_code_top'] = SocCodeAggregator(
                 corpus_creator=corpus_creator,
-                occupation_classifier=top_classifier
+                occupation_classifier=top_classifier,
+                output_count=2,
+                output_total=True
             )
             aggregator = GeoTitleAggregator(
                 job_aggregators=job_aggregators,
@@ -183,8 +193,8 @@ def define_title_counts(main_dag_name):
 
             logging.info(
                 'Found %s count rows and %s title rollup rows for %s',
-                len(aggregator.group_values.keys()),
-                len(aggregator.rollup.keys()),
+                len(aggregator.job_aggregators[0].group_values.keys()),
+                len(aggregator.job_aggregators[0].rollup.keys()),
                 quarter,
             )
             upload(
