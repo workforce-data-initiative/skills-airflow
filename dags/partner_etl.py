@@ -9,7 +9,9 @@ except ImportError:
 from skills_utils.s3 import split_s3_path
 
 from config import config
-from operators.partner_etl import PartnerETLOperator
+from operators.partner_etl import PartnerETLOperator,\
+    PartnerStatsAggregateOperator,\
+    GlobalStatsAggregateOperator
 from utils.dags import QuarterlySubDAG
 
 
@@ -21,13 +23,14 @@ def define_partner_etl(main_dag_name):
         return dag
     bucket, prefix = split_s3_path(config['job_postings']['s3_path'])
 
+    partner_stats = {}
     for partner_id, s3_path in raw_jobs.items():
         importer_class = importers[partner_id]
 
         input_bucket, input_prefix = split_s3_path(s3_path)
 
-        PartnerETLOperator(
-            task_id=partner_id,
+        etl = PartnerETLOperator(
+            task_id='{}_etl'.format(partner_id),
             dag=dag,
             transformer_class=importer_class,
             output_bucket=bucket,
@@ -38,5 +41,17 @@ def define_partner_etl(main_dag_name):
                 'prefix': input_prefix,
             }
         )
+
+        partner_stats[partner_id] = PartnerStatsAggregateOperator(
+            task_id='{}_partner_agg'.format(partner_id),
+            dag=dag,
+            partner_id=partner_id
+        )
+
+        partner_stats[partner_id].set_upstream(etl)
+
+    global_stats = GlobalStatsAggregateOperator(task_id='global_agg', dag=dag)
+    for partner_stats_instance in partner_stats.values():
+        global_stats.set_upstream(partner_stats_instance)
 
     return dag

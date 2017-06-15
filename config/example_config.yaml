@@ -14,6 +14,8 @@ output_tables:
     cleaned_title_count_dir: 'cleaned_title_count'
 local_mode: True
 output_folder: 'output'
+partner_stats:
+    s3_path: 'stats-bucket/partner-etl'
 raw_jobs_s3_paths:
     XX: 'some-bucket/jobs/dump/'
 airflow_contacts:
