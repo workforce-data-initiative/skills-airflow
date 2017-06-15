@@ -35,16 +35,22 @@ def define_soc_counts(main_dag_name):
             s3_conn = S3Hook().get_conn()
             quarter = datetime_to_quarter(context['execution_date'])
 
-            count_filename = '{}/{}/{}.csv'.format(
+            group_folder = '{}/{}'.format(
                 output_folder,
                 config['output_tables'][self.group_config_key],
-                quarter
             )
-            rollup_filename = '{}/{}/{}.csv'.format(
+            if not os.path.isdir(group_folder):
+                os.mkdir(group_folder)
+
+            rollup_folder = '{}/{}'.format(
                 output_folder,
                 config['output_tables'][self.rollup_config_key],
-                quarter
             )
+            if not os.path.isdir(rollup_folder):
+                os.mkdir(rollup_folder)
+
+            count_filename = '{}/{}.csv'.format(group_folder, quarter)
+            rollup_filename = '{}/{}.csv'.format(rollup_folder, quarter)
 
             job_postings_generator = job_postings_highmem(
                 s3_conn,
@@ -86,7 +92,7 @@ def define_soc_counts(main_dag_name):
                 )
             )
 
-    class GeoSOCCommonCountOperator(BaseOperator):
+    class GeoSOCCommonCountOperator(GeoSOCCountOperator):
         group_config_key = 'geo_soc_common_count_dir'
         rollup_config_key = 'soc_common_count_dir'
 
@@ -97,7 +103,7 @@ def define_soc_counts(main_dag_name):
                 classify_kwargs={'mode': 'common'}
             )
 
-    class GeoSOCTopCountOperator(BaseOperator):
+    class GeoSOCTopCountOperator(GeoSOCCountOperator):
         group_config_key = 'geo_soc_top_count_dir'
         rollup_config_key = 'soc_top_count_dir'
 
