@@ -16,6 +16,8 @@ output_tables:
     soc_common_count_dir: 'soc_common_count'
     geo_soc_top_count_dir: 'geo_soc_top_count'
     soc_top_count_dir: 'soc_top_count'
+    geo_soc_given_count_dir: 'geo_soc_given_count'
+    soc_given_count_dir: 'soc_given_count'
 local_mode: True
 output_folder: 'output'
 partner_stats:

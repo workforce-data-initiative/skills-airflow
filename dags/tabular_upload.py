@@ -7,22 +7,90 @@ from skills_utils.time import datetime_to_quarter
 from airflow.hooks import S3Hook
 import os
 
-FOLDER_READMES = {
-    'cleaned_geo_title_count': """Counts of job posting title occurrences by CBSA.
+table_config = config['output_tables']
 
-Job titles are cleaned by lowercasing, removing punctuation, and removing city and state names.""",
-    'cleaned_title_count': """Counts of job posting title occurrences.
+COMMON_TITLE_AGG_INFO = """Includes:
+- The top ONET skills (KSATs) extracted from the job postings
+    of the given job title
+- The top predicted ONET SOC codes from two different in-development
+    versions of our classifier based on job posting content
+    of the given job title
+- The top ONET SOC codes given to us by the data partner
+    for job postings of the given job title
+"""
 
-Job titles are cleaned by lowercasing, removing punctuation, and removing city and state names.""",
-    'geo_title_count': """Counts of job posting title occurrences by CBSA.
+folder_readmes = {}
+folder_readmes[table_config['cleaned_geo_title_count_dir']] = """
+Counts of job posting title occurrences by CBSA.
 
-Job titles are cleaned by lowercasing and removing punctuation.""",
-    'title_count': """Counts of job posting title occurrences.
+{agg_info}
 
-Job titles are cleaned by lowercasing and removing punctuation.""",
-}
+Job titles are cleaned by lowercasing, removing punctuation, and removing city and state names."""\
+    .format(agg_info=COMMON_TITLE_AGG_INFO)
 
-QUARTERLY_NOTE = """Each file contains the data for job postings active in one quarter. If a job posting was active in two quarters, it will be present in the counts of both quarters."""
+folder_readmes[table_config['cleaned_title_count_dir']] = """
+Counts of job posting title occurrences.
+
+{agg_info}
+
+Job titles are cleaned by lowercasing, removing punctuation, and removing city and state names."""\
+    .format(agg_info=COMMON_TITLE_AGG_INFO)
+
+folder_readmes[table_config['geo_title_count_dir']] = """
+Counts of job posting title occurrences by CBSA.
+
+{agg_info}
+
+Job titles are cleaned by lowercasing and removing punctuation."""\
+    .format(agg_info=COMMON_TITLE_AGG_INFO)
+
+folder_readmes[table_config['title_count_dir']] = """
+Counts of job posting title occurrences.
+
+{agg_info}
+
+Job titles are cleaned by lowercasing and removing punctuation."""\
+    .format(agg_info=COMMON_TITLE_AGG_INFO)
+
+folder_readmes[table_config['geo_soc_common_count_dir']] = """
+Job postings per SOC code, by CBSA.
+
+SOC code inferred by 'common match' method
+"""
+
+folder_readmes[table_config['soc_common_count_dir']] = """
+Job postings per SOC code
+
+SOC code inferred by 'common match' method
+"""
+
+folder_readmes[table_config['geo_soc_top_count_dir']] = """
+Job postings per SOC code, by CBSA.
+
+SOC code inferred by 'top match' method
+"""
+
+folder_readmes[table_config['soc_top_count_dir']] = """
+Job postings per SOC code
+
+SOC code inferred by 'top match' method
+"""
+
+folder_readmes[table_config['geo_soc_given_count_dir']] = """
+Job postings per SOC code, by CBSA.
+
+SOC code given by data source
+"""
+
+folder_readmes[table_config['soc_given_count_dir']] = """
+Job postings per SOC code
+
+SOC code given by data source
+"""
+
+QUARTERLY_NOTE = """Each file contains the data for job postings active in one quarter.
+If a job posting was active in two quarters,
+it will be present in the counts of both quarters."""
 
 
 def define_tabular_upload(main_dag_name):
@@ -39,7 +107,7 @@ def define_tabular_upload(main_dag_name):
             s3_conn = S3Hook().get_conn()
             quarter = datetime_to_quarter(context['execution_date'])
 
-            for folder_name, readme_string in FOLDER_READMES.items():
+            for folder_name, readme_string in folder_readmes.items():
                 full_folder = '{}/{}'.format(local_folder, folder_name)
                 if not os.path.isdir(full_folder):
                     os.mkdir(full_folder)
@@ -60,7 +128,7 @@ def define_tabular_upload(main_dag_name):
             base_readme_filepath = os.path.join(local_folder, 'README.txt')
             with open(base_readme_filepath, 'w') as readme_file:
                 readme_file.write("Open Skills Datasets\n\n")
-                for folder_name, readme_string in FOLDER_READMES.items():
+                for folder_name, readme_string in folder_readmes.items():
                     readme_file.write("###" + folder_name + "###\n\n")
                     readme_file.write(readme_string + "\n\n\n")
             upload(s3_conn, base_readme_filepath, upload_s3_path)

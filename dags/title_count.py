@@ -12,7 +12,7 @@ from skills_utils.time import datetime_to_quarter
 from skills_utils.s3 import upload
 from skills_ml.datasets.job_postings import job_postings_highmem
 from skills_ml.algorithms.aggregators import\
-    CountAggregator, SkillAggregator, SocCodeAggregator
+    CountAggregator, SkillAggregator, SocCodeAggregator, GivenSocCodeAggregator
 from skills_ml.algorithms.aggregators.title import GeoTitleAggregator
 from skills_ml.algorithms.corpus_creators.basic import SimpleCorpusCreator
 from skills_ml.algorithms.jobtitle_cleaner.clean import JobTitleStringClean
@@ -85,6 +85,10 @@ def define_title_counts(main_dag_name):
             job_aggregators['soc_code_top'] = SocCodeAggregator(
                 corpus_creator=corpus_creator,
                 occupation_classifier=top_classifier,
+                output_count=2,
+                output_total=True
+            )
+            job_aggregators['soc_code_given'] = GivenSocCodeAggregator(
                 output_count=2,
                 output_total=True
             )
@@ -180,6 +184,10 @@ def define_title_counts(main_dag_name):
             job_aggregators['soc_code_top'] = SocCodeAggregator(
                 corpus_creator=corpus_creator,
                 occupation_classifier=top_classifier,
+                output_count=2,
+                output_total=True
+            )
+            job_aggregators['soc_code_given'] = GivenSocCodeAggregator(
                 output_count=2,
                 output_total=True
             )
