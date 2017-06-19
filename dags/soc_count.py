@@ -114,7 +114,15 @@ def define_soc_counts(main_dag_name):
                 classify_kwargs={'mode': 'top'}
             )
 
+    class GeoSOCGivenCountOperator(GeoSOCCountOperator):
+        group_config_key = 'geo_soc_given_count_dir'
+        rollup_config_key = 'soc_given_count_dir'
+
+        def classifier(self, s3_conn):
+            return None
+
     GeoSOCCommonCountOperator(task_id='geo_soc_common_count', dag=dag)
     GeoSOCTopCountOperator(task_id='geo_soc_top_count', dag=dag)
+    GeoSOCGivenCountOperator(task_id='geo_soc_given_count', dag=dag)
 
     return dag
