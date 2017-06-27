@@ -18,12 +18,18 @@ output_tables:
     soc_top_count_dir: 'soc_top_count'
     geo_soc_given_count_dir: 'geo_soc_given_count'
     soc_given_count_dir: 'soc_given_count'
+model_cache:
+    s3_path: 'some-bucket/cache-dir/'
+    local_path: '/fastdisk/'
 local_mode: True
 output_folder: 'output'
 partner_stats:
     s3_path: 'stats-bucket/partner-etl'
 raw_jobs_s3_paths:
     XX: 'some-bucket/jobs/dump/'
+aggregation:
+    n_processes: 8
+    batch_size: 10000
 airflow_contacts:
     - datascifellows@gmail.com
 ...

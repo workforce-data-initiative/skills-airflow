@@ -1,6 +1,8 @@
 dist: trusty
 language: python
 python: 3.4
+addons:
+    postgresql: "9.4"
 env:
 - BOTO_CONFIG=/tmp/nowhere PYTHONPATH='.'
 before_install:
