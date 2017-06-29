@@ -4,6 +4,8 @@ from utils.dags import QuarterlySubDAG
 from config import config
 from skills_utils.s3 import download, upload
 from skills_utils.time import datetime_to_quarter
+from skills_ml.algorithms.aggregators.dataset_transform import \
+    DatasetStatsAggregator, DatasetStatsCounter, GlobalStatsAggregator
 from airflow.hooks import S3Hook
 import os
 
@@ -32,72 +34,73 @@ def define_tabular_upload(main_dag_name):
             table_config = config['output_tables']
             folder_readmes = {}
             folder_readmes[table_config['cleaned_geo_title_count_dir']] = """
-            Counts of job posting title occurrences by CBSA.
+Counts of job posting title occurrences by CBSA.
 
-            {agg_info}
+{agg_info}
 
-            Job titles are cleaned by lowercasing, removing punctuation, and removing city and state names."""\
+Job titles are cleaned by lowercasing, removing punctuation, and removing city and state names."""\
                 .format(agg_info=COMMON_TITLE_AGG_INFO)
 
             folder_readmes[table_config['cleaned_title_count_dir']] = """
-            Counts of job posting title occurrences.
+Counts of job posting title occurrences.
 
-            {agg_info}
+{agg_info}
 
-            Job titles are cleaned by lowercasing, removing punctuation, and removing city and state names."""\
+Job titles are cleaned by lowercasing, removing punctuation, and removing city and state names."""\
                 .format(agg_info=COMMON_TITLE_AGG_INFO)
 
             folder_readmes[table_config['geo_title_count_dir']] = """
-            Counts of job posting title occurrences by CBSA.
+Counts of job posting title occurrences by CBSA.
 
-            {agg_info}
+{agg_info}
 
-            Job titles are cleaned by lowercasing and removing punctuation."""\
+Job titles are cleaned by lowercasing and removing punctuation."""\
                 .format(agg_info=COMMON_TITLE_AGG_INFO)
 
             folder_readmes[table_config['title_count_dir']] = """
-            Counts of job posting title occurrences.
+Counts of job posting title occurrences.
 
-            {agg_info}
+{agg_info}
 
-            Job titles are cleaned by lowercasing and removing punctuation."""\
+Job titles are cleaned by lowercasing and removing punctuation."""\
                 .format(agg_info=COMMON_TITLE_AGG_INFO)
 
             folder_readmes[table_config['geo_soc_common_count_dir']] = """
-            Job postings per SOC code, by CBSA.
+Job postings per SOC code, by CBSA.
 
-            SOC code inferred by 'common match' method
+SOC code inferred by 'common match' method
             """
 
             folder_readmes[table_config['soc_common_count_dir']] = """
-            Job postings per SOC code
+Job postings per SOC code
 
-            SOC code inferred by 'common match' method
+SOC code inferred by 'common match' method
             """
 
             folder_readmes[table_config['geo_soc_top_count_dir']] = """
-            Job postings per SOC code, by CBSA.
+Job postings per SOC code, by CBSA.
 
-            SOC code inferred by 'top match' method
+SOC code inferred by 'top match' method
             """
 
             folder_readmes[table_config['soc_top_count_dir']] = """
-            Job postings per SOC code
+Job postings per SOC code
 
-            SOC code inferred by 'top match' method
+SOC code inferred by 'top match' method
             """
 
             folder_readmes[table_config['geo_soc_given_count_dir']] = """
-            Job postings per SOC code, by CBSA.
+Job postings per SOC code, by CBSA.
 
-            SOC code given by data source
+SOC code given by data source
             """
 
             folder_readmes[table_config['soc_given_count_dir']] = """
-            Job postings per SOC code
+Job postings per SOC code
 
-            SOC code given by data source
+SOC code given by data source
             """
+
             local_folder = config.get('output_folder', 'output')
             if not os.path.isdir(local_folder):
                 os.mkdir(local_folder)
@@ -125,12 +128,27 @@ def define_tabular_upload(main_dag_name):
                 upload(s3_conn, readme_filepath, upload_s3_folder)
                 upload(s3_conn, data_filepath, upload_s3_folder)
 
+            # metadata
+            stats_s3_path = config['partner_stats']['s3_path']
+            total_jobs = GlobalStatsAggregator(s3_conn=s3_conn)\
+                .saved_total(stats_s3_path)
+            quarterly_stats = DatasetStatsCounter\
+                .quarterly_posting_stats(s3_conn, stats_s3_path)
+            partner_list = DatasetStatsAggregator\
+                .partners(s3_conn, stats_s3_path)
+
             base_readme_filepath = os.path.join(local_folder, 'README.txt')
             with open(base_readme_filepath, 'w') as readme_file:
                 readme_file.write("Open Skills Datasets\n\n")
                 for folder_name, readme_string in folder_readmes.items():
                     readme_file.write("###" + folder_name + "###\n\n")
                     readme_file.write(readme_string + "\n\n\n")
+                readme_file.write('Dataset Stats\n\n')
+                readme_file.write('Total Job Postings: ' + str(total_jobs) + "\n")
+                readme_file.write('Quarterly Counts\n')
+                for quarter in sorted(quarterly_stats.keys()):
+                    readme_file.write(quarter + ': ' + str(quarterly_stats[quarter]) + '\n')
+                readme_file.write('Partners: ' + ','.join(partner_list) + '\n')
             upload(s3_conn, base_readme_filepath, upload_s3_path)
 
     TabularUploadOperator(task_id='tabular_upload', dag=dag)
