@@ -38,6 +38,9 @@ normalizer:
     titles_master_index_name: # name of desired job title index name
 raw_jobs_s3_paths:
     XX: 'some-bucket/jobs/dump/' # key is partner code, value is s3 path to partner's s3 path
+usa_jobs_credentials: # if you want to sync USAJobs data, include your API key information
+    auth_key: 'akey'
+    key_email: 'anemail@email.com'
 airflow_contacts: # a list of email addresses to send errors to
     - myemail@email.com
 ```

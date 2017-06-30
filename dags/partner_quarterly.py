@@ -11,11 +11,11 @@ default_args = {
 }
 
 
-def define_partner_update(main_dag_name):
+def define_partner_quarterly(main_dag_name):
     dag = DAG(
-        dag_id='{}.partner_update'.format(main_dag_name),
+        dag_id='{}.partner_quarterly'.format(main_dag_name),
         default_args=default_args,
-        schedule_interval='@once'
+        schedule_interval='0 0 1 */3 *',
     )
 
     raw_jobs = config.get('raw_jobs_s3_paths', {})
