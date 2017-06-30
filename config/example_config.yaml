@@ -30,6 +30,9 @@ raw_jobs_s3_paths:
 aggregation:
     n_processes: 8
     batch_size: 10000
+usa_jobs_credentials:
+    auth_key: 'akey'
+    key_email: 'anemail@email.com'
 airflow_contacts:
     - datascifellows@gmail.com
 ...
