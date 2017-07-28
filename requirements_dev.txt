@@ -4,4 +4,4 @@ mock
 moto
 pytest-cov
 pytest
-testing.postgresql
+testing.postgresql==1.3.0
