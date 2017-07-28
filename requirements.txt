@@ -1,5 +1,5 @@
 airflow[s3]==1.8.0
-alembic
+alembic==0.9.3
 joblib
 
 git+git://github.com/workforce-data-initiative/skills-ml.git@master
