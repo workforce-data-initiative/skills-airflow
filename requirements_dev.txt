@@ -1,6 +1,6 @@
 codecov
 httpretty==0.8.10
-mock
+mock==2.0.0
 moto
 pytest-cov
 pytest
