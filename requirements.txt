@@ -1,4 +1,4 @@
-airflow[s3]<1.8
+airflow[s3]==1.8.0
 alembic
 joblib
 
