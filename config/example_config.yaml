@@ -27,6 +27,10 @@ partner_stats:
     s3_path: 'stats-bucket/partner-etl'
 raw_jobs_s3_paths:
     XX: 'some-bucket/jobs/dump/'
+geocoder:
+    s3_path: 'geo-bucket/geocodes.json'
+cbsa_lookup:
+    s3_path: 'geo-bucket/cbsas.json'
 aggregation:
     n_processes: 8
     batch_size: 10000
