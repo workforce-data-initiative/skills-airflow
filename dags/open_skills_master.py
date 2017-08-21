@@ -16,6 +16,7 @@ from dags.job_vectorize import define_job_vectorize
 from dags.skill_tag import define_skill_tag
 from dags.job_title_sample import define_job_title_sample
 from dags.tabular_upload import define_tabular_upload
+from dags.geocode import define_geocode
 
 from config import config
 
@@ -34,6 +35,7 @@ partner_quarterly_dag = define_partner_quarterly(MAIN_DAG_NAME)
 partner_nightly_dag = define_partner_nightly(MAIN_DAG_NAME)
 onet_extract_dag = define_onet_extract(MAIN_DAG_NAME)
 normalizer_index_dag = define_normalizer_index(MAIN_DAG_NAME)
+geocode_dag = define_geocode(MAIN_DAG_NAME)
 title_count_dag = define_title_counts(MAIN_DAG_NAME)
 soc_count_dag = define_soc_counts(MAIN_DAG_NAME)
 job_label_dag = define_job_label(MAIN_DAG_NAME)
@@ -81,6 +83,12 @@ onet_extract = SubDagOperator(
 normalizer_index = SubDagOperator(
     subdag=normalizer_index_dag,
     task_id='normalize_elasticsearch',
+    dag=dag,
+)
+
+geocode = SubDagOperator(
+    subdag=geocode_dag,
+    task_id='geocode',
     dag=dag,
 )
 
@@ -133,8 +141,9 @@ api_sync.set_upstream(onet_extract)
 api_sync.set_upstream(normalizer_index)
 normalizer_index.set_upstream(partner_etl)
 normalizer_index.set_upstream(onet_extract)
-title_count.set_upstream(partner_etl)
-soc_count.set_upstream(partner_etl)
+geocode.set_upstream(partner_etl)
+title_count.set_upstream(geocode)
+soc_count.set_upstream(geocode)
 job_label.set_upstream(partner_etl)
 job_vectorize.set_upstream(partner_etl)
 skill_tag.set_upstream(partner_etl)

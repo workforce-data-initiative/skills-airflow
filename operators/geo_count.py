@@ -8,6 +8,8 @@ from airflow.hooks import S3Hook
 from airflow.operators import BaseOperator
 
 from skills_ml.datasets.job_postings import job_postings_highmem
+from skills_ml.algorithms.job_geography_queriers import JobCBSAFromGeocodeQuerier
+from skills_ml.algorithms.geocoders.cbsa import S3CachedCBSAFinder
 from skills_utils.time import datetime_to_quarter
 from skills_utils.iteration import Batch
 from skills_utils.s3 import upload, split_s3_path
@@ -27,11 +29,16 @@ class GeoCountOperator(BaseOperator):
 
         super(GeoCountOperator, self).__init__(*args, **kwargs)
 
-    def map(self, pool, job_postings_generator, temp_dir):
+    def map(self, pool, job_postings_generator, geo_querier, temp_dir):
         passthroughs = self.passthroughs()
+        aggregator_constructor_with_geo_querier = partial(
+            self.aggregator_constructor(),
+            geo_querier=geo_querier
+        )
+
         bound_mapping_function = partial(
             self.map_function,
-            aggregator_constructor=self.aggregator_constructor(),
+            aggregator_constructor=aggregator_constructor_with_geo_querier,
             temp_dir=temp_dir,
             **passthroughs
         )
@@ -119,12 +126,23 @@ class GeoCountOperator(BaseOperator):
                 quarter,
                 config['job_postings']['s3_path']
             )
+            geo_querier = JobCBSAFromGeocodeQuerier(
+                cbsa_results=S3CachedCBSAFinder(
+                    s3_conn=s3_conn,
+                    cache_s3_path=config['cbsa_lookup']['s3_path']
+                ).all_cached_cbsa_results
+            )
 
             logging.basicConfig(
                 format='%(asctime)s %(process)d %(levelname)s: %(message)s'
             )
             with Pool(processes=config['aggregation']['n_processes']) as pool:
-                it = self.map(pool, job_postings_generator, temp_dir)
+                it = self.map(
+                    pool=pool,
+                    job_postings_generator=job_postings_generator,
+                    geo_querier=geo_querier,
+                    temp_dir=temp_dir
+                )
                 combined_agg = self.reduce(it)
             self.save(combined_agg, quarter, s3_conn)
 
