@@ -2,6 +2,6 @@ codecov==2.0.9
 httpretty==0.8.10
 mock==2.0.0
 moto==1.0.1
-pytest-cov
+pytest-cov==2.5.1
 pytest==3.2.0
 testing.postgresql
