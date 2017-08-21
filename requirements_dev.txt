@@ -3,5 +3,5 @@ httpretty==0.8.10
 mock
 moto
 pytest-cov
-pytest==3.2.0
+pytest==3.2.1
 testing.postgresql
