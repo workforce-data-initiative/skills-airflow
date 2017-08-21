@@ -8,7 +8,7 @@ from airflow.operators import BaseOperator
 from skills_utils.time import datetime_to_quarter
 from skills_ml.datasets import job_postings
 
-from skills_ml.algorithms.corpus_creators.basic import GensimCorpusCreator
+from skills_ml.algorithms.corpus_creators.basic import Doc2VecGensimCorpusCreator
 from skills_ml.algorithms.job_vectorizers.doc2vec_vectorizer import Doc2Vectorizer
 
 from utils.dags import QuarterlySubDAG
@@ -27,7 +27,7 @@ def define_job_vectorize(main_dag_name):
             with open(job_vector_filename, 'w') as outfile:
                 writer = csv.writer(outfile, delimiter=',')
                 job_postings_generator = job_postings(s3_conn, quarter, config['job_postings']['s3_path'])
-                corpus_generator = GensimCorpusCreator().array_corpora(job_postings_generator)
+                corpus_generator = Doc2VecGensimCorpusCreator().array_corpora(job_postings_generator)
                 vectorized_job_generator = Doc2Vectorizer(model_name='gensim_doc2vec',
                                                           path=config['job_vectorizer_cache']['s3_path'],
                                                           s3_conn=s3_conn).vectorize(corpus_generator)
