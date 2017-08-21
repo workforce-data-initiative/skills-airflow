@@ -205,7 +205,6 @@ def count_aggregate(
     return save(
         aggregator,
         temp_dir,
-        job_postings
     )
 
 
