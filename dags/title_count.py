@@ -6,13 +6,13 @@ import os
 
 from airflow.hooks import S3Hook
 from skills_ml.algorithms.aggregators import\
-    CountAggregator, SkillAggregator, SocCodeAggregator, GivenSocCodeAggregator
+    CountAggregator, OccupationScopedSkillAggregator, SocCodeAggregator, GivenSocCodeAggregator
 from skills_ml.algorithms.aggregators.title import GeoTitleAggregator
 from skills_ml.algorithms.corpus_creators.basic import SimpleCorpusCreator
 from skills_ml.algorithms.jobtitle_cleaner.clean import JobTitleStringClean
 from skills_ml.algorithms.string_cleaners import NLPTransforms
 from skills_ml.algorithms.skill_extractors.freetext\
-    import FreetextSkillExtractor
+    import OccupationScopedSkillExtractor
 from skills_ml.algorithms.occupation_classifiers.classifiers import \
     Classifier, download_ann_classifier_files
 from skills_utils.s3 import download
@@ -65,9 +65,9 @@ def skill_aggregate(
             s3_path=config['output_tables']['s3_path'] + '/skills_master_table.tsv'
         )
     corpus_creator = SimpleCorpusCreator()
-    job_aggregators = {'onet_skills': SkillAggregator(
+    job_aggregators = {'onet_skills': OccupationScopedSkillAggregator(
         corpus_creator=corpus_creator,
-        skill_extractor=FreetextSkillExtractor(
+        skill_extractor=OccupationScopedSkillExtractor(
             skills_filename=skills_filename
         ),
         output_count=10
