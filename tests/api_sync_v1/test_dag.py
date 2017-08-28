@@ -4,6 +4,7 @@ from datetime import datetime
 from sqlalchemy.orm import sessionmaker
 from sqlalchemy import create_engine
 from airflow import models
+from airflow.jobs import BackfillJob
 from mock import patch
 from dags.open_skills_master import api_sync_dag
 from api_sync.v1.models import JobMaster,\
@@ -15,26 +16,33 @@ import os
 import logging
 
 DEFAULT_DATE = datetime(2013, 5, 1)
-configuration.test_mode()
+configuration.load_test_config()
 
 
 def test_dag():
-    dag = api_sync_dag
     with testing.postgresql.Postgresql() as postgresql:
-        configuration.test_mode()
-
         with patch.dict(os.environ, {
             'API_V1_DB_URL': postgresql.url(),
             'OUTPUT_FOLDER': 'tests/api_sync_v1/input'
         }):
+            configuration.load_test_config()
+            # the scheduler messages, which will show up if something
+            # happens to screw up execution, are INFO level so save us
+            # some headaches but switching to that loglevel here
+            logging.basicConfig(level=logging.INFO)
             bag = models.DagBag()
-            bag.bag_dag(dag, dag, dag)
-            dag.clear(start_date=DEFAULT_DATE, end_date=DEFAULT_DATE)
-            dag.run(start_date=DEFAULT_DATE, end_date=DEFAULT_DATE, local=True)
-
+            dag = bag.get_dag(dag_id='open_skills_master.api_v1_sync')
+            # expire old DAG runs, otherwise the max of 16 will automatically get scheduled
+            dag.dagrun_timeout = 1
+            dag.clear()
+            job = BackfillJob(
+                dag=dag,
+                start_date=DEFAULT_DATE,
+                end_date=DEFAULT_DATE,
+            )
+            job.run()
             engine = create_engine(postgresql.url())
             session = sessionmaker(engine)()
-            logging.warning(session.query(JobMaster).all())
             num_jobs = session.query(JobMaster).count()
             assert num_jobs > 1
             num_skills = session.query(SkillMaster).count()
