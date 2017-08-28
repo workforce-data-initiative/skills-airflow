@@ -12,7 +12,7 @@ import os
 
 COMMON_TITLE_AGG_INFO = """Includes:
 - The top ONET skills (KSATs) extracted from the job postings
-    of the given job title
+    of the given job title. Only includes skills that ONET recognizes as being relevant to the occupation given by the data source.
 - The top predicted ONET SOC codes from two different in-development
     versions of our classifier based on job posting content
     of the given job title
