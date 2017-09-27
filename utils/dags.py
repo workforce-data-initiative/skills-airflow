@@ -17,5 +17,6 @@ class QuarterlySubDAG(DAG):
             full_dag_name,
             schedule_interval='0 0 1 */3 *',
             default_args=default_args,
+            max_active_runs=1
             *args, **kwargs
         )
