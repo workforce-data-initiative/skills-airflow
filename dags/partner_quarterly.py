@@ -16,10 +16,13 @@ def define_partner_quarterly(main_dag_name):
         dag_id='{}.partner_quarterly'.format(main_dag_name),
         default_args=default_args,
         schedule_interval='0 0 1 */3 *',
+        max_active_runs=1
     )
 
     raw_jobs = config.get('raw_jobs_s3_paths', {})
     if not raw_jobs:
+        return dag
+    if 'VA' not in raw_jobs:
         return dag
     va_bucket, va_prefix = split_s3_path(raw_jobs['VA'])
     PartnerUpdateOperator(

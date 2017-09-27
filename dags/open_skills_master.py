@@ -6,7 +6,6 @@ from airflow.operators.subdag_operator import SubDagOperator
 from dags.api_sync_v1 import define_api_sync
 from dags.partner_etl import define_partner_etl
 from dags.partner_quarterly import define_partner_quarterly
-from dags.partner_nightly import define_partner_nightly
 from dags.onet_extract import define_onet_extract
 from dags.elasticsearch_normalizer import define_normalizer_index
 from dags.title_count import define_title_counts
@@ -32,7 +31,6 @@ MAIN_DAG_NAME = 'open_skills_master'
 api_sync_dag = define_api_sync(MAIN_DAG_NAME)
 partner_etl_dag = define_partner_etl(MAIN_DAG_NAME)
 partner_quarterly_dag = define_partner_quarterly(MAIN_DAG_NAME)
-partner_nightly_dag = define_partner_nightly(MAIN_DAG_NAME)
 onet_extract_dag = define_onet_extract(MAIN_DAG_NAME)
 normalizer_index_dag = define_normalizer_index(MAIN_DAG_NAME)
 geocode_dag = define_geocode(MAIN_DAG_NAME)
@@ -53,89 +51,108 @@ dag = DAG(
 api_sync = SubDagOperator(
     subdag=api_sync_dag,
     task_id='api_v1_sync',
+    priority_weight=1,
+    queue='subdag',
     dag=dag,
 )
 
 partner_etl = SubDagOperator(
     subdag=partner_etl_dag,
     task_id='partner_etl',
+    priority_weight=1,
+    queue='subdag',
     dag=dag,
 )
 
 partner_quarterly = SubDagOperator(
     subdag=partner_quarterly_dag,
     task_id='partner_quarterly',
-    dag=dag,
-)
-
-partner_nightly = SubDagOperator(
-    subdag=partner_nightly_dag,
-    task_id='partner_nightly',
+    priority_weight=1,
+    queue='subdag',
     dag=dag,
 )
 
 onet_extract = SubDagOperator(
     subdag=onet_extract_dag,
     task_id='onet_extract',
+    priority_weight=1,
+    queue='subdag',
     dag=dag,
 )
 
 normalizer_index = SubDagOperator(
     subdag=normalizer_index_dag,
     task_id='normalize_elasticsearch',
+    priority_weight=1,
+    queue='subdag',
     dag=dag,
 )
 
 geocode = SubDagOperator(
     subdag=geocode_dag,
     task_id='geocode',
+    priority_weight=1,
+    queue='subdag',
     dag=dag,
 )
 
 title_count = SubDagOperator(
     subdag=title_count_dag,
     task_id='title_count',
+    priority_weight=1,
+    queue='subdag',
     dag=dag,
 )
 
 soc_count = SubDagOperator(
     subdag=soc_count_dag,
     task_id='soc_count',
+    priority_weight=1,
+    queue='subdag',
     dag=dag
 )
 
 job_label = SubDagOperator(
     subdag=job_label_dag,
     task_id='job_label',
+    priority_weight=1,
+    queue='subdag',
     dag=dag,
 )
 
 job_vectorize = SubDagOperator(
     subdag=job_vectorize_dag,
     task_id='job_vectorize',
+    priority_weight=1,
+    queue='subdag',
     dag=dag,
 )
 
 skill_tag = SubDagOperator(
     subdag=skill_tag_dag,
     task_id='skill_tag',
+    priority_weight=1,
+    queue='subdag',
     dag=dag,
 )
 
 job_title_sample = SubDagOperator(
     subdag=job_title_sample_dag,
     task_id='job_title_sample',
+    priority_weight=1,
+    queue='subdag',
     dag=dag,
 )
 
 tabular_upload = SubDagOperator(
     subdag=tabular_upload_dag,
     task_id='tabular_upload',
+    priority_weight=1,
+    queue='subdag',
     dag=dag
 )
 
 partner_etl.set_upstream(partner_quarterly)
-partner_etl.set_upstream(partner_nightly)
 api_sync.set_upstream(title_count)
 api_sync.set_upstream(onet_extract)
 api_sync.set_upstream(normalizer_index)

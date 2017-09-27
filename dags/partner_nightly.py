@@ -11,21 +11,17 @@ default_args = {
     'start_date': datetime(2017, 5, 1),
 }
 
+dag = DAG(
+    dag_id='partner_nightly',
+    default_args=default_args,
+    schedule_interval='@daily',
+    max_active_runs=1
+)
 
-def define_partner_nightly(main_dag_name):
-    dag = DAG(
-        dag_id='{}.partner_nightly'.format(main_dag_name),
-        default_args=default_args,
-        schedule_interval='@daily'
-    )
+raw_jobs = config.get('raw_jobs_s3_paths', {})
 
-    raw_jobs = config.get('raw_jobs_s3_paths', {})
-    if not raw_jobs:
-        return dag
-
-    usa_jobs_credentials = config.get('usa_jobs_credentials', {})
-    if not usa_jobs_credentials:
-        return dag
+usa_jobs_credentials = config.get('usa_jobs_credentials', {})
+if raw_jobs and usa_jobs_credentials:
     PartnerSnapshotOperator(
         task_id='usa_jobs_update',
         dag=dag,
@@ -33,5 +29,3 @@ def define_partner_nightly(main_dag_name):
         updater_class=USAJobsUpdater,
         passthrough_kwargs=usa_jobs_credentials
     )
-
-    return dag
