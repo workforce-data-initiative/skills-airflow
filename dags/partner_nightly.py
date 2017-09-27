@@ -19,18 +19,13 @@ dag = DAG(
 )
 
 raw_jobs = config.get('raw_jobs_s3_paths', {})
-if not raw_jobs:
-    return dag
 
 usa_jobs_credentials = config.get('usa_jobs_credentials', {})
-if not usa_jobs_credentials:
-    return dag
-PartnerSnapshotOperator(
-    task_id='usa_jobs_update',
-    dag=dag,
-    s3_prefix=raw_jobs['US'],
-    updater_class=USAJobsUpdater,
-    passthrough_kwargs=usa_jobs_credentials
-)
-
-return dag
+if raw_jobs and usa_jobs_credentials:
+    PartnerSnapshotOperator(
+        task_id='usa_jobs_update',
+        dag=dag,
+        s3_prefix=raw_jobs['US'],
+        updater_class=USAJobsUpdater,
+        passthrough_kwargs=usa_jobs_credentials
+    )
