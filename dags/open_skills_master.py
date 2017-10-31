@@ -13,7 +13,6 @@ from dags.soc_count import define_soc_counts
 from dags.job_label import define_job_label
 from dags.job_vectorize import define_job_vectorize
 from dags.skill_tag import define_skill_tag
-from dags.job_title_sample import define_job_title_sample
 from dags.tabular_upload import define_tabular_upload
 from dags.geocode import define_geocode
 
@@ -39,7 +38,6 @@ soc_count_dag = define_soc_counts(MAIN_DAG_NAME)
 job_label_dag = define_job_label(MAIN_DAG_NAME)
 job_vectorize_dag = define_job_vectorize(MAIN_DAG_NAME)
 skill_tag_dag = define_skill_tag(MAIN_DAG_NAME)
-job_title_sample_dag = define_job_title_sample(MAIN_DAG_NAME)
 tabular_upload_dag = define_tabular_upload(MAIN_DAG_NAME)
 
 dag = DAG(
@@ -136,14 +134,6 @@ skill_tag = SubDagOperator(
     dag=dag,
 )
 
-job_title_sample = SubDagOperator(
-    subdag=job_title_sample_dag,
-    task_id='job_title_sample',
-    priority_weight=1,
-    queue='subdag',
-    dag=dag,
-)
-
 tabular_upload = SubDagOperator(
     subdag=tabular_upload_dag,
     task_id='tabular_upload',
@@ -165,5 +155,4 @@ job_label.set_upstream(partner_etl)
 job_vectorize.set_upstream(partner_etl)
 skill_tag.set_upstream(partner_etl)
 skill_tag.set_upstream(onet_extract)
-job_title_sample.set_upstream(title_count)
 tabular_upload.set_upstream(title_count)
