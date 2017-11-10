@@ -3,6 +3,7 @@ import os
 from functools import partial
 from multiprocessing import Pool
 import tempfile
+import traceback
 
 from airflow.hooks import S3Hook
 from airflow.operators import BaseOperator
@@ -137,13 +138,17 @@ class GeoCountOperator(BaseOperator):
                 format='%(asctime)s %(process)d %(levelname)s: %(message)s'
             )
             with Pool(processes=config['aggregation']['n_processes']) as pool:
-                it = self.map(
-                    pool=pool,
-                    job_postings_generator=job_postings_generator,
-                    geo_querier=geo_querier,
-                    temp_dir=temp_dir
-                )
-                combined_agg = self.reduce(it)
+                try:
+                    it = self.map(
+                        pool=pool,
+                        job_postings_generator=job_postings_generator,
+                        geo_querier=geo_querier,
+                        temp_dir=temp_dir
+                    )
+                    combined_agg = self.reduce(it)
+                except Exception as e:
+                    logging.error("Child error: {}".format(traceback.format_exc()))
+                    raise
             self.save(combined_agg, quarter, s3_conn)
 
 
