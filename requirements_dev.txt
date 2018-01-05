@@ -1,4 +1,4 @@
-codecov==2.0.9
+codecov==2.0.12
 httpretty==0.8.10
 mock==2.0.0
 moto==1.1.24
