@@ -38,11 +38,11 @@ Our system can be more resilient to failure if we save more pieces of data on ea
 
 This can be organized in S3 like the following:
 
-`job_posting_attributes/skill_extract_onet_ksat_exact/<job_posting_id>`
+`job_posting_attributes/skill_extract_onet_ksat_exact/<datePosted>`
 
 or
 
-`job_posting_attributes/<job_posting_id>/skill_extract_onet_ksat_exact`
+`job_posting_attributes/<datePosted>/skill_extract_onet_ksat_exact`
 
 
 I think from a technical perspective either way would be workable, but either might be preferable from our perspective in terms of inspecting this intermediate output manually.
