@@ -2,5 +2,5 @@ apache-airflow[s3]>=1.8.1
 joblib==0.11
 alembic==0.9.6
 
-git+git://github.com/workforce-data-initiative/skills-ml.git@master
-git+git://github.com/workforce-data-initiative/skills-utils.git@master
+skills-ml ~= 0.2
+skills-utils ~= 0.2
