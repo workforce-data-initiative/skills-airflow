@@ -146,7 +146,7 @@ tabular_upload = SubDagOperator(
 
 test_process = SubDagOperator(
     subdag=test_dag,
-    task_id='test',
+    task_id='test_process',
     priority_weight=1,
     queue='subdag',
     dag=dag
