@@ -125,4 +125,5 @@ class ClassifyCommon(BaseOperator, QuarterlyJobPostingMixin):
 
 def define_test(main_dag_name):
     dag = QuarterlySubDAG(main_dag_name, 'test_process')
+    TitleCleanPhaseOne(task_id='title_clean_phase_one', dag=dag)
     return dag
