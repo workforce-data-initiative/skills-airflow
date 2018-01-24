@@ -15,6 +15,7 @@ from dags.job_vectorize import define_job_vectorize
 from dags.skill_tag import define_skill_tag
 from dags.tabular_upload import define_tabular_upload
 from dags.geocode import define_geocode
+from dags.test_process import define_test
 
 from config import config
 
@@ -39,6 +40,7 @@ job_label_dag = define_job_label(MAIN_DAG_NAME)
 job_vectorize_dag = define_job_vectorize(MAIN_DAG_NAME)
 skill_tag_dag = define_skill_tag(MAIN_DAG_NAME)
 tabular_upload_dag = define_tabular_upload(MAIN_DAG_NAME)
+test_dag = define_test(MAIN_DAG_NAME)
 
 dag = DAG(
     dag_id=MAIN_DAG_NAME,
@@ -142,6 +144,14 @@ tabular_upload = SubDagOperator(
     dag=dag
 )
 
+test_process = SubDagOperator(
+    subdag=test_dag,
+    task_id='test',
+    priority_weight=1,
+    queue='subdag',
+    dag=dag
+)
+
 partner_etl.set_upstream(partner_quarterly)
 api_sync.set_upstream(title_count)
 api_sync.set_upstream(onet_extract)
@@ -156,3 +166,4 @@ job_vectorize.set_upstream(partner_etl)
 skill_tag.set_upstream(partner_etl)
 skill_tag.set_upstream(onet_extract)
 tabular_upload.set_upstream(title_count)
+test_process.set_upstream(partner_etl)

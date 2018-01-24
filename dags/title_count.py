@@ -24,6 +24,7 @@ from uuid import uuid4
 from functools import partial
 import logging
 import joblib
+from collections.abc import MutableMapping
 
 
 def save(aggregator, temp_dir):
