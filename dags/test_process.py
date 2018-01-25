@@ -1,7 +1,11 @@
 from collections.abc import MutableMapping
+from collections import Counter
 import s3fs
 import json
 import logging
+import os
+import tempfile
+from skills_utils.s3 import download
 from config import config
 from skills_utils.time import datetime_to_quarter
 from airflow.hooks import S3Hook
@@ -13,19 +17,23 @@ from skills_ml.algorithms.occupation_classifiers.classifiers import \
     Classifier, download_ann_classifier_files
 from skills_ml.algorithms.corpus_creators.basic import SimpleCorpusCreator
 from utils.dags import QuarterlySubDAG
+from skills_ml.algorithms.skill_extractors.freetext\
+    import OccupationScopedSkillExtractor, ExactMatchSkillExtractor
 
 
 class S3BackedJsonDict(MutableMapping):
     def __init__(self, *args, **kw):
-        self.path = kw.pop('path')
+        self.path = kw.pop('path') + '.json'
         self.fs = s3fs.S3FileSystem()
 
         if self.fs.exists(self.path):
             with self.fs.open(self.path, 'rb') as f:
-                self._storage = json.load(f)
+                data = f.read().decode('utf-8') or '{}'
+                self._storage = json.loads(data)
         else:
             self._storage = dict()
 
+        logging.info('Loaded storage with %s keys', len(self))
     def __getitem__(self, key):
         return self._storage[key]
 
@@ -35,18 +43,35 @@ class S3BackedJsonDict(MutableMapping):
     def __len__(self):
         return len(self._storage)
 
-    def __del__(self):
-        logging.info('Saving on del')
-        with self.fs.open(self.path, 'wb') as f:
-            json.dump(self._storage, f)
+    def __delitem__(self, key):
+        del self._storage[key]
 
+    def __setitem__(self, key, value):
+        self._storage[key] = value
+
+    def __keytransform__(self, key):
+        return key
+
+    def __contains__(self, key):
+        return key in self._storage
+
+    def save(self):
+        logging.info('Saving storage of length %s on del to %s', len(self), self.path)
+        with self.fs.open(self.path, 'wb') as f:
+            f.write(json.dumps(self._storage).encode('utf-8'))
+  
+    def __del__(self):
+        self.save()
 
 def compute_job_posting_properties(s3_conn, job_postings_generator, property_name, property_computer):
     caches = {}
-    for job_posting in job_postings_generator:
-        job_obj = json.loads(job_posting)
-        date_posted = job_obj.get('datePosted', 'unknown')
-        if not caches[date_posted]:
+    misses = 0
+    hits = 0
+    for number, job_posting in enumerate(job_postings_generator):
+        if number % 1000 == 0:
+            logging.info('Computation of job posting properties for %s on posting %s', property_name, number)
+        date_posted = job_posting.get('datePosted', 'unknown')
+        if date_posted not in caches:
             caches[date_posted] = S3BackedJsonDict(
                 path='/'.join([
                     config['job_posting_computed_properties']['s3_path'],
@@ -54,20 +79,24 @@ def compute_job_posting_properties(s3_conn, job_postings_generator, property_nam
                     date_posted
                 ])
             )
-        if job_obj['id'] not in caches[date_posted]:
-            caches[date_posted][job_obj['id']] = property_computer(job_obj['title'])
-
+        if job_posting['id'] not in caches[date_posted]:
+            caches[date_posted][job_posting['id']] = property_computer(job_posting)
+            misses += 1
+        else:
+            hits += 1
+    logging.info('Computation of job posting properties for %s complete. %s hits did not need computation, %s misses were computed', property_name, hits, misses)
 
 class QuarterlyJobPostingMixin(object):
     def job_postings_generator(self, context):
         quarter = datetime_to_quarter(context['execution_date'])
         s3_conn = S3Hook().get_conn()
 
-        return job_postings_highmem(
+        for job_posting_string in job_postings_highmem(
             s3_conn,
             quarter,
             config['job_postings']['s3_path']
-        )
+        ):
+            yield json.loads(job_posting_string)
 
 
 class TitleCleanPhaseOne(BaseOperator, QuarterlyJobPostingMixin):
@@ -105,25 +134,136 @@ class TitleCleanPhaseTwo(BaseOperator, QuarterlyJobPostingMixin):
 class ClassifyCommon(BaseOperator, QuarterlyJobPostingMixin):
     def execute(self, context):
         s3_conn = S3Hook().get_conn()
-        common_classifier = Classifier(
-            s3_conn=s3_conn,
-            classifier_id='ann_0614',
-            classify_kwargs={'mode': 'common'},
-        )
-        corpus_creator = SimpleCorpusCreator()
+        with tempfile.TemporaryDirectory() as temp_dir:
+            common_classifier = Classifier(
+                s3_conn=s3_conn,
+                classifier_id='ann_0614',
+                classify_kwargs={'mode': 'common'},
+                temporary_directory=temp_dir
+            )
+            corpus_creator = SimpleCorpusCreator()
 
+            def func(job_posting):
+                return common_classifier.classify(corpus_creator._transform(job_posting))
+
+            compute_job_posting_properties(
+                s3_conn=s3_conn,
+                job_postings_generator=self.job_postings_generator(context),
+                property_name='soc_common',
+                property_computer=func
+            )
+
+
+class ClassifyTop(BaseOperator, QuarterlyJobPostingMixin):
+    def execute(self, context):
+        s3_conn = S3Hook().get_conn()
+        with tempfile.TemporaryDirectory() as temp_dir:
+            common_classifier = Classifier(
+                s3_conn=s3_conn,
+                classifier_id='ann_0614',
+                classify_kwargs={'mode': 'top'},
+                temporary_directory=temp_dir
+            )
+            corpus_creator = SimpleCorpusCreator()
+
+            def func(job_posting):
+                return common_classifier.classify(corpus_creator._transform(job_posting))
+
+            compute_job_posting_properties(
+                s3_conn=s3_conn,
+                job_postings_generator=self.job_postings_generator(context),
+                property_name='soc_top',
+                property_computer=func
+            )
+
+class ClassifyGiven(BaseOperator, QuarterlyJobPostingMixin):
+    def execute(self, context):
+        s3_conn = S3Hook().get_conn()
         def func(job_posting):
-            return common_classifier.classify(corpus_creator._transform(job_posting))
+            return job_posting.get('onet_soc_code', '99-9999.00')
 
         compute_job_posting_properties(
             s3_conn=s3_conn,
             job_postings_generator=self.job_postings_generator(context),
-            property_name='soc_common',
+            property_name='soc_given',
             property_computer=func
         )
 
 
+class SocScopedExactMatchSkillCounts(BaseOperator, QuarterlyJobPostingMixin):
+    def execute(self, context):
+        s3_conn = S3Hook().get_conn()
+        skills_file = 'skills_master_table.tsv'
+        with tempfile.TemporaryDirectory() as temp_dir:
+            skills_filename = '{}/{}'.format(temp_dir, skills_file)
+
+            if not os.path.isfile(skills_filename):
+                download(
+                  s3_conn=s3_conn,
+                  out_filename=skills_filename,
+                  s3_path=config['output_tables']['s3_path'] + skills_file
+            )
+            corpus_creator = SimpleCorpusCreator()
+            skill_extractor = OccupationScopedSkillExtractor(skill_lookup_path=skills_filename)
+            def func(job_posting):
+                return skill_extractor.document_skill_counts(
+                  soc_code=job_posting.get('onet_soc_code', '99-9999.00'),
+                  document=corpus_creator._transform(job_posting)
+                )
+            compute_job_posting_properties(
+                s3_conn=s3_conn,
+                job_postings_generator=self.job_postings_generator(context),
+                property_name='skill_counts_soc_scoped',
+                property_computer=func
+            )
+
+class ExactMatchSkillCounts(BaseOperator, QuarterlyJobPostingMixin):
+    def execute(self, context):
+        s3_conn = S3Hook().get_conn()
+        skills_file = 'skills_master_table.tsv'
+        with tempfile.TemporaryDirectory() as temp_dir:
+            skills_filename = '{}/{}'.format(temp_dir, skills_file)
+
+            if not os.path.isfile(skills_filename):
+                download(
+                  s3_conn=s3_conn,
+                  out_filename=skills_filename,
+                  s3_path=config['output_tables']['s3_path'] + skills_file
+            )
+            corpus_creator = SimpleCorpusCreator()
+            skill_extractor = ExactMatchSkillExtractor(skill_lookup_path=skills_filename)
+            def func(job_posting):
+                return skill_extractor.document_skill_counts(
+                  document=corpus_creator._transform(job_posting)
+                )
+            compute_job_posting_properties(
+                s3_conn=s3_conn,
+                job_postings_generator=self.job_postings_generator(context),
+                property_name='skill_counts_exact_match',
+                property_computer=func
+            )
+
+class PostingIdPresent(BaseOperator, QuarterlyJobPostingMixin):
+    def execute(self, context):
+        s3_conn = S3Hook().get_conn()
+
+        def func(job_posting):
+            return 1
+        compute_job_posting_properties(
+            s3_conn=s3_conn,
+            job_postings_generator=self.job_postings_generator(context),
+            property_name='posting_id_present',
+            property_computer=func
+        )
+
 def define_test(main_dag_name):
     dag = QuarterlySubDAG(main_dag_name, 'test_process')
     TitleCleanPhaseOne(task_id='title_clean_phase_one', dag=dag)
+    TitleCleanPhaseTwo(task_id='title_clean_phase_two', dag=dag)
+    ClassifyCommon(task_id='soc_common', dag=dag)
+    ClassifyTop(task_id='soc_top', dag=dag)
+    ClassifyGiven(task_id='soc_given', dag=dag)
+    SocScopedExactMatchSkillCounts(task_id='skill_counts_exact_match_soc_scoped', dag=dag)
+    ExactMatchSkillCounts(task_id='skill_counts_exact_match', dag=dag)
+    PostingIdPresent(task_id='posting_id_present', dag=dag)
     return dag
