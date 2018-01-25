@@ -16,6 +16,8 @@ This means that every single rollup level has to be separately computed. So far,
 
 As a side effect, it also makes it tough for internal researchers to see how an individual job posting was processed. What skills did we extract from a particular job posting? What SOC code did we assign to a particular job posting? We don't know without manually running it ourselves.
 
+There's another insidious side effect: when all the processing happens in the context of aggregation by geography, it means that geocoding must be finished before any other processing can happen! Geocoding can take a long time. But other types of processing (occupation classification, sophisticated skill extraction) can take a while too, and ideally we could run those in parallel.
+
 ## Potential Solution Options
 
 ### Spark/Dask
@@ -76,7 +78,7 @@ This is both more resilient (if there is an error rolling up by quarter, the dai
 ## Plan of Attack
 From an engineering perspective, large changes like these can be tough to implement. But if done in a certain order, we can make the changes one-by-one, and get incremental value while not requiring significant scaffolding to make the changes work separately. If we were to abandon this rearchitecture project midway through, the incremental improvements would still be in effect.
 
-1. *Save job-posting level attributes*. This change isn't really dependent on any other changes, and can make the system more resilient on its own. The processing methods (skill extraction, occupation classification) already have their own tasks defined; just make these save raw data instead of aggregations. So there is a quarterly skill extraction task that saves all the extracted skills for that quarter to the given place on S3. Make the aggregation task depend on all of them being complete. We have to figure out caching and cache-busting, but I think a simple flag to control reusing existing data versus replace it would work just fine.
+1. *Save job-posting level attributes*. This change isn't really dependent on any other changes, and can make the system more resilient on its own. The processing methods (skill extraction, occupation classification) already have their own tasks defined; just make these save raw data instead of aggregations. So there is a quarterly skill extraction task that saves all the extracted skills for that quarter to the given place on S3. Make the aggregation task depend on all of them being complete. We have to figure out caching and cache-busting, but I think a simple flag to control reusing existing data versus replace it would work just fine. Geocoding, in this case, should only block CBSA-finding and the final aggregation. Other processing tasks for a quarter can be kicked off in parallel to geocoding.
 
 2. *Make the aggregation outputs freely rollup-able*
 Similarly, the change in aggregation format is not too dependent on the time granularity of the aggregation. It can simply save in the new format, and the task that produces the research hub datasets can now take on the additional task of converting the detailed JSON output into a tabular format instead of the simple columnar join it's doing now. The aggregation tasks still are working with a lot of data, so multiprocessing will still be used in the stack at this point.

@@ -16,9 +16,11 @@ from skills_ml.algorithms.jobtitle_cleaner.clean import JobTitleStringClean
 from skills_ml.algorithms.occupation_classifiers.classifiers import \
     Classifier, download_ann_classifier_files
 from skills_ml.algorithms.corpus_creators.basic import SimpleCorpusCreator
+from skills_ml.algorithms.job_geography_queriers import JobCBSAFromGeocodeQuerier
 from utils.dags import QuarterlySubDAG
 from skills_ml.algorithms.skill_extractors.freetext\
     import OccupationScopedSkillExtractor, ExactMatchSkillExtractor
+from skills_ml.algorithms.geocoders.cbsa import S3CachedCBSAFinder
 
 
 class S3BackedJsonDict(MutableMapping):
@@ -256,6 +258,26 @@ class PostingIdPresent(BaseOperator, QuarterlyJobPostingMixin):
             property_computer=func
         )
 
+
+class CBSAandStateFromGeocode(BaseOperator, QuarterlyJobPostingMixin):
+    def execute(self, context):
+        s3_conn = S3Hook().get_conn()
+        geo_querier = JobCBSAFromGeocodeQuerier(
+            cbsa_results=S3CachedCBSAFinder(
+                s3_conn=s3_conn,
+                cache_s3_path=config['cbsa_lookup']['s3_path']
+            ).all_cached_cbsa_results
+        )
+        def func(job_posting):
+            return geo_querier.query(json.dumps(job_posting))
+       
+        compute_job_posting_properties(
+            s3_conn=s3_conn,
+            job_postings_generator=self.job_postings_generator(context),
+            property_name='cbsa_and_state_from_geocode',
+            property_computer=func
+        )
+
 def define_test(main_dag_name):
     dag = QuarterlySubDAG(main_dag_name, 'test_process')
     TitleCleanPhaseOne(task_id='title_clean_phase_one', dag=dag)
@@ -266,4 +288,5 @@ def define_test(main_dag_name):
     SocScopedExactMatchSkillCounts(task_id='skill_counts_exact_match_soc_scoped', dag=dag)
     ExactMatchSkillCounts(task_id='skill_counts_exact_match', dag=dag)
     PostingIdPresent(task_id='posting_id_present', dag=dag)
+    CBSAandStateFromGeocode(task_id='cbsa_and_state_from_geocode', dag=dag)
     return dag
