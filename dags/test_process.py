@@ -296,6 +296,7 @@ def define_test(main_dag_name):
     ExactMatchSkillCounts(task_id='skill_counts_exact_match', dag=dag)
     PostingIdPresent(task_id='posting_id_present', dag=dag)
     CBSAandStateFromGeocode(task_id='cbsa_and_state_from_geocode', dag=dag)
+    TitleCountAggregate(task_id='title_count_aggregate', dag=dag)
     return dag
 
 
@@ -304,24 +305,29 @@ def daterange(start_date, end_date):
         yield start_date + timedelta(n)
 
 
-def job_posting_computed_properties(s3_conn, quarter, property_names):
+def job_posting_computed_properties(s3_conn, quarter, grouping_properties, aggregate_properties):
     start_date, end_date = quarter_to_daterange(quarter)
     for included_date in daterange(start_date, end_date):
         datestring = included_date.strftime("%Y-%m-%d")
-        cache = S3BackedJsonDict(
-            path='/'.join([
-                config['job_posting_computed_properties']['s3_path'],
-                property_names[0],
-                datestring
-            ])
-        )
-        import pdb
-        pdb.set_trace()
+        dataframes = []
+        for property_name in grouping_properties + aggregate_properties:
+            cache = S3BackedJsonDict(
+                path='/'.join([
+                    config['job_posting_computed_properties']['s3_path'],
+                    property_name,
+                    datestring
+                ])
+            )
+            df = pandas.DataFrame.from_dict(cache, orient='index')
+            df.columns = [property_name]
+            dataframes.append(df)
+        big_df = dataframes[0].join(dataframes[1:])
+        aggregates = big_df.groupby(grouping_properties).apply(numpy.sum)
 
 class TitleCountAggregate(BaseOperator):
-    left = ['title_clean_phase_one']
-    right = ['posting_id_present']
+    left = ['title_clean_phase_one', 'cbsa_and_state_from_geocode']
+    right = ['posting_id_present', 'soc_common']
     def execute(self, context):
         s3_conn = S3Hook().get_conn()
         quarter = datetime_to_quarter(context['execution_date'])
-        job_posting_computed_properties(s3_conn, quarter, self.left + self.right)
+        job_posting_computed_properties(s3_conn, quarter, self.left, self.right)
