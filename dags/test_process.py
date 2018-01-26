@@ -1,6 +1,7 @@
 from collections.abc import MutableMapping
 from datetime import timedelta
 import s3fs
+from collections import Counter
 import json
 import logging
 import os
@@ -216,10 +217,12 @@ class SocScopedExactMatchSkillCounts(BaseOperator, QuarterlyJobPostingMixin):
             skill_extractor = OccupationScopedSkillExtractor(skill_lookup_path=skills_filename)
 
             def func(job_posting):
-                return skill_extractor.document_skill_counts(
+                count_dict = skill_extractor.document_skill_counts(
                   soc_code=job_posting.get('onet_soc_code', '99-9999.00'),
                   document=corpus_creator._transform(job_posting)
                 )
+                count_list = [[k] * v for k, v in count_dict.items()] 
+                return count_list
             compute_job_posting_properties(
                 job_postings_generator=self.job_postings_generator(context),
                 property_name='skill_counts_soc_scoped',
@@ -244,9 +247,12 @@ class ExactMatchSkillCounts(BaseOperator, QuarterlyJobPostingMixin):
             skill_extractor = ExactMatchSkillExtractor(skill_lookup_path=skills_filename)
 
             def func(job_posting):
-                return skill_extractor.document_skill_counts(
+                count_dict = skill_extractor.document_skill_counts(
                   document=corpus_creator._transform(job_posting)
                 )
+                count_lists = [[k] * v for k, v in count_dict.items()] 
+                flattened = [count for countlist in count_lists for count in countlist]
+                return {'skill_counts_exact_match': flattened}
             compute_job_posting_properties(
                 job_postings_generator=self.job_postings_generator(context),
                 property_name='skill_counts_exact_match',
@@ -306,7 +312,7 @@ def daterange(start_date, end_date):
         yield start_date + timedelta(n)
 
 
-def job_posting_computed_properties(s3_conn, quarter, grouping_properties, aggregate_properties, aggregate_functions):
+def job_posting_computed_properties(s3_conn, quarter, grouping_properties, aggregate_properties, aggregate_functions, aggregation_name):
     start_date, end_date = quarter_to_daterange(quarter)
     for included_date in daterange(start_date, end_date):
         datestring = included_date.strftime("%Y-%m-%d")
@@ -319,13 +325,30 @@ def job_posting_computed_properties(s3_conn, quarter, grouping_properties, aggre
                     datestring
                 ])
             )
+            if len(cache) == 0:
+                continue
+            logging.info('Attempting to open dataframe at path %s', cache.path)
             df = pandas.DataFrame.from_dict(cache, orient='index')
             df.columns = property_columns
             dataframes.append(df)
+        if len(dataframes) == 0:
+            continue
         big_df = dataframes[0].join(dataframes[1:])
-        aggregates = big_df.groupby(grouping_properties).agg(aggregate_functions)
+        column_lists = [p[1] for p in grouping_properties]
+        final_columns = [col for collist in column_lists for col in collist]
         import pdb
-        pdb.set_trace()
+        #pdb.set_trace()
+        aggregates = big_df.groupby(final_columns).agg(aggregate_functions)
+        aggregates.columns = ['_'.join(t) for t in aggregates.columns]
+        out_path = '/'.join([
+            config['job_posting_aggregations']['s3_path'],
+            aggregation_name,
+            datestring + '.csv'
+        ])
+        fs = s3fs.S3FileSystem()
+
+        with fs.open(out_path, 'wb') as f:
+            f.write(aggregates.to_csv(None).encode())
 
 class TitleCountAggregate(BaseOperator):
     left = [
@@ -333,20 +356,40 @@ class TitleCountAggregate(BaseOperator):
         ('cbsa_and_state_from_geocode', ['cbsa_fips', 'cbsa_name', 'state_code']),
     ]
     right = [
-        ('posting_id_present' ['posting_id_present']),
-        ('soc_common', ['soc_common'])
+        ('posting_id_present', ['posting_id_present']),
+        ('soc_common', ['soc_common', 'common_similarity_score']),
+        ('soc_top', ['soc_top', 'top_similarity_score']),
+        ('soc_given', ['soc_given']),
+        ('skill_counts_exact_match', ['skill_counts_exact_match']),
     ]
-    aggregate_functions = {
-        'posting_id_present': numpy.sum,
-        'soc_common': numpy.sum
-    }
     def execute(self, context):
         s3_conn = S3Hook().get_conn()
         quarter = datetime_to_quarter(context['execution_date'])
+        def most_common(iterable):
+            return Counter(iterable).most_common(1)[0][0]
+        def second_most_common(iterable):
+            return Counter(iterable).most_common(2)[-1][0]
+        def listy_most_common(iterable):
+            bc = Counter()
+            for i in iterable:
+                bc += Counter(i)
+            if bc:
+                return bc.most_common(1)[0][0]
+            else:
+                return ''
+        aggregate_functions = {
+            'posting_id_present': numpy.sum,
+            'soc_common': [most_common, second_most_common],
+            'soc_top': [most_common, second_most_common],
+            'soc_given': [most_common, second_most_common],
+            'skill_counts_exact_match': [listy_most_common],
+        }
+        aggregation_name = 'geo_title_count'
         job_posting_computed_properties(
             s3_conn,
             quarter,
             self.left,
             self.right,
-            self.aggregate_functions
+            aggregate_functions,
+            aggregation_name
         )
