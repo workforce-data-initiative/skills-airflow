@@ -23,6 +23,7 @@ from skills_ml.algorithms.skill_extractors.freetext\
     import OccupationScopedSkillExtractor, ExactMatchSkillExtractor
 from skills_ml.algorithms.geocoders.cbsa import S3CachedCBSAFinder
 import pandas
+import numpy
 
 
 class S3BackedJsonDict(MutableMapping):
@@ -305,12 +306,12 @@ def daterange(start_date, end_date):
         yield start_date + timedelta(n)
 
 
-def job_posting_computed_properties(s3_conn, quarter, grouping_properties, aggregate_properties):
+def job_posting_computed_properties(s3_conn, quarter, grouping_properties, aggregate_properties, aggregate_functions):
     start_date, end_date = quarter_to_daterange(quarter)
     for included_date in daterange(start_date, end_date):
         datestring = included_date.strftime("%Y-%m-%d")
         dataframes = []
-        for property_name in grouping_properties + aggregate_properties:
+        for property_name, property_columns in grouping_properties + aggregate_properties:
             cache = S3BackedJsonDict(
                 path='/'.join([
                     config['job_posting_computed_properties']['s3_path'],
@@ -319,15 +320,33 @@ def job_posting_computed_properties(s3_conn, quarter, grouping_properties, aggre
                 ])
             )
             df = pandas.DataFrame.from_dict(cache, orient='index')
-            df.columns = [property_name]
+            df.columns = property_columns
             dataframes.append(df)
         big_df = dataframes[0].join(dataframes[1:])
-        aggregates = big_df.groupby(grouping_properties).apply(numpy.sum)
+        aggregates = big_df.groupby(grouping_properties).agg(aggregate_functions)
+        import pdb
+        pdb.set_trace()
 
 class TitleCountAggregate(BaseOperator):
-    left = ['title_clean_phase_one', 'cbsa_and_state_from_geocode']
-    right = ['posting_id_present', 'soc_common']
+    left = [
+        ('title_clean_phase_one', ['title_clean_phase_one']),
+        ('cbsa_and_state_from_geocode', ['cbsa_fips', 'cbsa_name', 'state_code']),
+    ]
+    right = [
+        ('posting_id_present' ['posting_id_present']),
+        ('soc_common', ['soc_common'])
+    ]
+    aggregate_functions = {
+        'posting_id_present': numpy.sum,
+        'soc_common': numpy.sum
+    }
     def execute(self, context):
         s3_conn = S3Hook().get_conn()
         quarter = datetime_to_quarter(context['execution_date'])
-        job_posting_computed_properties(s3_conn, quarter, self.left, self.right)
+        job_posting_computed_properties(
+            s3_conn,
+            quarter,
+            self.left,
+            self.right,
+            self.aggregate_functions
+        )
