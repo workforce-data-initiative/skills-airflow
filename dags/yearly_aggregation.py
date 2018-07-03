@@ -111,19 +111,24 @@ class PostingIdPresentOp(JobPostingComputedPropertyOperator):
 default_args = {
     'owner': 'airflow',
     'depends_on_past': False,
-    'start_date': datetime(2015, 6, 1),
+    'start_date': datetime(2010, 1, 1),
     'email': ['airflow@example.com'],
     'email_on_failure': False,
     'email_on_retry': False,
     'retries': 1,
     'retry_delay': timedelta(minutes=5),
+    #'schedule_interval': '@yearly',
     # 'queue': 'bash_queue',
     # 'pool': 'backfill',
     # 'priority_weight': 10,
     # 'end_date': datetime(2016, 1, 1),
 }
 
-dag = DAG('test_process', default_args=default_args)
+dag = DAG(
+    'yearly_aggregation',
+    default_args=default_args,
+    schedule_interval='0 0 31 12 *'
+)
 TitleCleanPhaseOneOp(task_id='title_clean_phase_one', dag=dag)
 TitleCleanPhaseTwoOp(task_id='title_clean_phase_two', dag=dag)
 #ClassifyCommon(task_id='soc_common', dag=dag)
