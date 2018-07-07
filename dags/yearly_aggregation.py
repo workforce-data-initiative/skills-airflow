@@ -16,12 +16,11 @@ from skills_ml.algorithms.skill_extractors import (
     FuzzyMatchSkillExtractor,
     SkillEndingPatternExtractor,
     AbilityEndingPatternExtractor,
+    SocScopedExactMatchSkillExtractor
 )
 from airflow import DAG
 from skills_ml.storage import S3Store
 from airflow.operators import BaseOperator
-from utils.dags import QuarterlySubDAG
-from functools import partial
 import logging
 
 
@@ -92,6 +91,15 @@ class FuzzyMatchONETSkillCountsOp(JobPostingComputedPropertyOperator):
         return SkillCounts(skill_extractor, **common_kwargs)
 
 
+class SocScopedExactMatchSkillCountsOp(JobPostingComputedPropertyOperator):
+    def computed_property(self, common_kwargs):
+        skill_extractor = SocScopedExactMatchSkillExtractor(
+            skill_lookup_path=config['skill_sources']['onet_ksat_with_soc'],
+            skill_lookup_name='onet_ksat',
+            skill_lookup_description='ONET Knowledge, Skills, Abilities, Tools, and Technology'
+        )
+        return SkillCounts(skill_extractor, **common_kwargs)
+
 class SkillEndingSkillCountsOp(JobPostingComputedPropertyOperator):
     def computed_property(self, common_kwargs):
         skill_extractor = SkillEndingPatternExtractor()
@@ -134,9 +142,9 @@ TitleCleanPhaseTwoOp(task_id='title_clean_phase_two', dag=dag)
 #ClassifyCommon(task_id='soc_common', dag=dag)
 #ClassifyTop(task_id='soc_top', dag=dag)
 #ClassifyGiven(task_id='soc_given', dag=dag)
-#SocScopedExactMatchSkillCountsOp(task_id='skill_counts_exact_match_soc_scoped', dag=dag)
 ExactMatchONETSkillCountsOp(task_id='skill_counts_exact_match_onet', dag=dag)
 FuzzyMatchONETSkillCountsOp(task_id='skill_counts_fuzzy_match_onet', dag=dag)
+SocScopedExactMatchSkillCountsOp(task_id='skill_counts_exact_match_onet_soc_scoped', dag=dag)
 SkillEndingSkillCountsOp(task_id='skill_counts_skill_ending', dag=dag)
 AbilityEndingSkillCountsOp(task_id='skill_counts_ability_ending', dag=dag)
 PostingIdPresentOp(task_id='posting_id_present', dag=dag)
