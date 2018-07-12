@@ -8,7 +8,7 @@ from skills_ml.job_postings.computed_properties.computers import (
     TitleCleanPhaseTwo,
     Geography,
     GivenSOC,
-    SocClassifyProperty,
+    #SocClassifyProperty,
     SkillCounts,
     PostingIdPresent
 )
@@ -94,10 +94,10 @@ class TitleCleanPhaseTwoOp(JobPostingComputedPropertyOperator):
         return TitleCleanPhaseTwo(**common_kwargs)
 
 
-class ClassifyCommonOp(JobPostingComputedPropertyOperator):
-    def computed_property(self, common_kwargs):
-        classifier = SocClassifier()
-        return SocClassifyProperty(classifier, **common_kwargs)
+#class ClassifyCommonOp(JobPostingComputedPropertyOperator):
+    #def computed_property(self, common_kwargs):
+        #classifier = SocClassifier()
+        #return SocClassifyProperty(classifier, **common_kwargs)
 
 class ExactMatchONETSkillCountsOp(JobPostingComputedPropertyOperator):
     def computed_property(self, common_kwargs):
