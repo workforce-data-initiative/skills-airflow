@@ -6,8 +6,9 @@ from skills_ml.job_postings.common_schema import JobPostingCollectionFromS3
 from skills_ml.job_postings.computed_properties.computers import (
     TitleCleanPhaseOne,
     TitleCleanPhaseTwo,
-    CBSAandStateFromGeocode,
+    Geography,
     GivenSOC,
+    SocClassifyProperty,
     SkillCounts,
     PostingIdPresent
 )
@@ -18,6 +19,13 @@ from skills_ml.algorithms.skill_extractors import (
     AbilityEndingPatternExtractor,
     SocScopedExactMatchSkillExtractor
 )
+
+from skills_ml.algorithms.geocoders import CachedGeocoder
+from skills_ml.algorithms.geocoders.cbsa import CachedCBSAFinder
+from skills_ml.job_postings.geography_queriers.cbsa import JobCBSAFromGeocodeQuerier
+from skills_ml.job_postings.geography_queriers.state import JobStateQuerier
+
+from skills_ml.algorithms.occupation_classifiers.classifiers import SocClassifier, KNNDoc2VecClassifier
 from airflow import DAG
 from skills_ml.storage import S3Store
 from airflow.operators import BaseOperator
@@ -31,6 +39,21 @@ def partition_key(transformed_document):
         logging.warning('No partition key available! Choosing fallback')
         partition_key = '-1'
     return partition_key
+
+# compute step:
+# for path in job posting paths:
+#   grab all individual s3 files under path using a prefix search
+#   for each file, spawn multiprocessing worker that:
+#       create JobPostingCollection for individual file
+#       create storage object with computed_properties_base_path/year/filename
+#       create computed property with storage object and partition key of static '0' (the partition is the file, no need for further partitioning)
+#       compute on job posting collection
+#
+# aggregation step:
+# for each property type:
+#   create storage object with computed_properties_base_path/year
+#   create computed property with storage object. partition func doesn't matter as we don't do any computing
+# call aggregation with all computed property objects
 
 
 class YearlyJobPostingOperatorMixin(object):
@@ -70,6 +93,11 @@ class TitleCleanPhaseTwoOp(JobPostingComputedPropertyOperator):
     def computed_property(self, common_kwargs):
         return TitleCleanPhaseTwo(**common_kwargs)
 
+
+class ClassifyCommonOp(JobPostingComputedPropertyOperator):
+    def computed_property(self, common_kwargs):
+        classifier = SocClassifier()
+        return SocClassifyProperty(classifier, **common_kwargs)
 
 class ExactMatchONETSkillCountsOp(JobPostingComputedPropertyOperator):
     def computed_property(self, common_kwargs):
@@ -116,6 +144,27 @@ class PostingIdPresentOp(JobPostingComputedPropertyOperator):
     def computed_property(self, common_kwargs):
         return PostingIdPresent(**common_kwargs)
 
+class CBSAOp(JobPostingComputedPropertyOperator):
+    def computed_property(self, common_kwargs):
+        geocoding_storage = S3Store(config['geocoding']['s3_path'])
+        geocoder = CachedGeocoder(
+            cache_storage=geocoding_storage,
+            cache_fname=config['geocoding']['raw_filename']
+        )
+        cbsa_finder = CachedCBSAFinder(
+            cache_storage=geocoding_storage,
+            cache_fname=config['geocoding']['cbsa_filename']
+        )
+        querier = JobCBSAFromGeocodeQuerier(geocoder=geocoder, cbsa_finder=cbsa_finder)
+        return Geography(geo_querier=querier, **common_kwargs)
+
+
+class StateOp(JobPostingComputedPropertyOperator):
+    def computed_property(self, common_kwargs):
+        querier = JobStateQuerier()
+        return Geography(geo_querier=querier, **common_kwargs)
+
+
 default_args = {
     'owner': 'airflow',
     'depends_on_past': False,
@@ -148,4 +197,5 @@ SocScopedExactMatchSkillCountsOp(task_id='skill_counts_exact_match_onet_soc_scop
 SkillEndingSkillCountsOp(task_id='skill_counts_skill_ending', dag=dag)
 AbilityEndingSkillCountsOp(task_id='skill_counts_ability_ending', dag=dag)
 PostingIdPresentOp(task_id='posting_id_present', dag=dag)
-#CBSAandStateFromGeocodeOp(task_id='cbsa_and_state_from_geocode', dag=dag)
+CBSAOp(task_id='cbsa_from_geocode', dag=dag)
+StateOp(task_id='state', dag=dag)
