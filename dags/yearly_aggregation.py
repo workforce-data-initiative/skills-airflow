@@ -12,6 +12,8 @@ from skills_ml.job_postings.computed_properties.computers import (
     SkillCounts,
     PostingIdPresent
 )
+from skills_ml.job_postings.computed_properties.aggregators import aggregate_properties
+
 from skills_ml.algorithms.skill_extractors import (
     ExactMatchSkillExtractor,
     FuzzyMatchSkillExtractor,
@@ -19,6 +21,7 @@ from skills_ml.algorithms.skill_extractors import (
     AbilityEndingPatternExtractor,
     SocScopedExactMatchSkillExtractor
 )
+import numpy
 
 from skills_ml.algorithms.geocoders import CachedGeocoder
 from skills_ml.algorithms.geocoders.cbsa import CachedCBSAFinder
@@ -73,6 +76,41 @@ class YearlyJobPostingOperatorMixin(object):
         computed_properties_base_path = config['job_posting_computed_properties']['s3_path']
 
         return S3Store(f'{computed_properties_base_path}/{year}')
+
+
+
+class AggregateOperator(BaseOperator, YearlyJobPostingOperatorMixin):
+    def aggregation_storage(self):
+        aggregations_base_path = config['job_posting_aggregations']['s3_path']
+        return S3Store(aggregations_base_path)
+
+    def execute(self, context):
+        year, _ = datetime_to_year_quarter(context['execution_date'])
+        common_kwargs = {'storage': self.storage(context)}
+        aggregate_path = aggregate_properties(
+            out_filename=year,
+            grouping_properties=self.grouping_properties(common_kwargs),
+            aggregate_properties=self.aggregate_properties(common_kwargs),
+            aggregate_functions={'posting_id_present': [numpy.sum]},
+            aggregation_name=self.aggregation_name,
+            storage=self.aggregation_storage()
+        )
+
+
+class TitleCountsByState(AggregateOperator):
+    aggregation_name = 'title_state_counts'
+
+    def grouping_properties(self, common_kwargs):
+        return [
+            TitleCleanPhaseOne(**common_kwargs),
+            Geography(JobStateQuerier(), **common_kwargs)
+        ]
+
+    def aggregate_properties(self, common_kwargs):
+        return [PostingIdPresent(**common_kwargs)]
+
+    def aggregate_functions(self):
+        return {'posting_id_present': [numpy.sum]}
 
 
 class JobPostingComputedPropertyOperator(BaseOperator, YearlyJobPostingOperatorMixin):
@@ -186,16 +224,21 @@ dag = DAG(
     default_args=default_args,
     schedule_interval='0 0 31 12 *'
 )
-TitleCleanPhaseOneOp(task_id='title_clean_phase_one', dag=dag)
-TitleCleanPhaseTwoOp(task_id='title_clean_phase_two', dag=dag)
+title_p1 = TitleCleanPhaseOneOp(task_id='title_clean_phase_one', dag=dag)
+title_p2 = TitleCleanPhaseTwoOp(task_id='title_clean_phase_two', dag=dag)
 #ClassifyCommon(task_id='soc_common', dag=dag)
 #ClassifyTop(task_id='soc_top', dag=dag)
 #ClassifyGiven(task_id='soc_given', dag=dag)
-ExactMatchONETSkillCountsOp(task_id='skill_counts_exact_match_onet', dag=dag)
-FuzzyMatchONETSkillCountsOp(task_id='skill_counts_fuzzy_match_onet', dag=dag)
-SocScopedExactMatchSkillCountsOp(task_id='skill_counts_exact_match_onet_soc_scoped', dag=dag)
-SkillEndingSkillCountsOp(task_id='skill_counts_skill_ending', dag=dag)
-AbilityEndingSkillCountsOp(task_id='skill_counts_ability_ending', dag=dag)
-PostingIdPresentOp(task_id='posting_id_present', dag=dag)
-CBSAOp(task_id='cbsa_from_geocode', dag=dag)
-StateOp(task_id='state', dag=dag)
+comp_exact_onet = ExactMatchONETSkillCountsOp(task_id='skill_counts_exact_match_onet', dag=dag)
+comp_fuzzy_onet = FuzzyMatchONETSkillCountsOp(task_id='skill_counts_fuzzy_match_onet', dag=dag)
+comp_soc_onet = SocScopedExactMatchSkillCountsOp(task_id='skill_counts_exact_match_onet_soc_scoped', dag=dag)
+comp_skill = SkillEndingSkillCountsOp(task_id='skill_counts_skill_ending', dag=dag)
+comp_ab = AbilityEndingSkillCountsOp(task_id='skill_counts_ability_ending', dag=dag)
+counts = PostingIdPresentOp(task_id='posting_id_present', dag=dag)
+cbsa = CBSAOp(task_id='cbsa_from_geocode', dag=dag)
+state = StateOp(task_id='state', dag=dag)
+
+title_state_counts = TitleCountsByState(task_id='title_counts_by_state', dag=dag)
+title_state_counts.set_upstream(state)
+title_state_counts.set_upstream(title_p1)
+title_state_counts.set_upstream(counts)
