@@ -87,14 +87,34 @@ class AggregateOperator(BaseOperator, YearlyJobPostingOperatorMixin):
     def execute(self, context):
         year, _ = datetime_to_year_quarter(context['execution_date'])
         common_kwargs = {'storage': self.storage(context)}
+        grouping_properties = self.grouping_properties(common_kwargs)
+        aggregate_properties = self.aggregate_properties(common_kwargs)
+        aggregate_functions = self.aggregate_functions()
         aggregate_path = aggregate_properties(
             out_filename=year,
-            grouping_properties=self.grouping_properties(common_kwargs),
-            aggregate_properties=self.aggregate_properties(common_kwargs),
-            aggregate_functions={'posting_id_present': [numpy.sum]},
+            grouping_properties=grouping_properties,
+            aggregate_properties=aggregate_properties,
+            aggregate_functions=aggregate_functions,
             aggregation_name=self.aggregation_name,
             storage=self.aggregation_storage()
         )
+
+        lines = []
+        lines.append('Grouping columns')
+        for group in grouping_properties:
+            for column in group.property_columns:
+                lines.append(f'{column.name}: {column.description}')
+        lines.append(' ')
+        lines.append('Aggregate columns')
+        for agg in aggregate_properties:
+            for column in agg.property_columns:
+                for aggfunc in aggregate_functions.get(column.name, []):
+                    funcname = base_func(aggfunc).__qualname__
+                    desc = next(desc for path, desc in column.compatible_aggregate_function_paths if funcname in path)
+                    full_desc = desc + ' ' + column.description
+                    lines.append(f'{column.name}: {full_desc}')
+        readme_string = '\r'.join(lines)
+        self.aggregation_storage().write(readme_string.encode('utf-8'), 'README.txt')
 
 
 class TitleCountsByState(AggregateOperator):
