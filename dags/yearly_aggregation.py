@@ -91,7 +91,7 @@ class AggregateOperator(BaseOperator, YearlyJobPostingOperatorMixin):
         aggregate_properties = self.aggregate_properties(common_kwargs)
         aggregate_functions = self.aggregate_functions()
         aggregate_path = aggregate_properties(
-            out_filename=year,
+            out_filename=str(year),
             grouping_properties=grouping_properties,
             aggregate_properties=aggregate_properties,
             aggregate_functions=aggregate_functions,
