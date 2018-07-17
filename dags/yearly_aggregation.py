@@ -59,6 +59,20 @@ def partition_key(transformed_document):
 # call aggregation with all computed property objects
 
 
+def cbsa_querier_property(common_kwargs):
+    geocoding_storage = S3Store(config['geocoding']['s3_path'])
+    geocoder = CachedGeocoder(
+        cache_storage=geocoding_storage,
+        cache_fname=config['geocoding']['raw_filename']
+    )
+    cbsa_finder = CachedCBSAFinder(
+        cache_storage=geocoding_storage,
+        cache_fname=config['geocoding']['cbsa_filename']
+    )
+    querier = JobCBSAFromGeocodeQuerier(geocoder=geocoder, cbsa_finder=cbsa_finder)
+    return Geography(geo_querier=querier, **common_kwargs)
+
+
 class YearlyJobPostingOperatorMixin(object):
     """Operate on quarterly job postings
 
@@ -149,6 +163,37 @@ class CleanedTitleCountsByState(AggregateOperator):
         return {'posting_id_present': [numpy.sum]}
 
 
+class TitleCountsByCBSA(AggregateOperator):
+    aggregation_name = 'title_cbsa_counts'
+
+    def grouping_properties(self, common_kwargs):
+        return [
+            TitleCleanPhaseOne(**common_kwargs),
+            cbsa_querier_property(common_kwargs)
+        ]
+
+    def aggregate_properties(self, common_kwargs):
+        return [PostingIdPresent(**common_kwargs)]
+
+    def aggregate_functions(self):
+        return {'posting_id_present': [numpy.sum]}
+
+
+class CleanedTitleCountsByCBSA(AggregateOperator):
+    aggregation_name = 'cleaned_title_cbsa_counts'
+
+    def grouping_properties(self, common_kwargs):
+        return [
+            TitleCleanPhaseTwo(**common_kwargs),
+            cbsa_querier_property(common_kwargs)
+        ]
+
+    def aggregate_properties(self, common_kwargs):
+        return [PostingIdPresent(**common_kwargs)]
+
+    def aggregate_functions(self):
+        return {'posting_id_present': [numpy.sum]}
+
 class JobPostingComputedPropertyOperator(BaseOperator, YearlyJobPostingOperatorMixin):
     def execute(self, context):
         common_kwargs = {
@@ -220,18 +265,7 @@ class PostingIdPresentOp(JobPostingComputedPropertyOperator):
 
 class CBSAOp(JobPostingComputedPropertyOperator):
     def computed_property(self, common_kwargs):
-        geocoding_storage = S3Store(config['geocoding']['s3_path'])
-        geocoder = CachedGeocoder(
-            cache_storage=geocoding_storage,
-            cache_fname=config['geocoding']['raw_filename']
-        )
-        cbsa_finder = CachedCBSAFinder(
-            cache_storage=geocoding_storage,
-            cache_fname=config['geocoding']['cbsa_filename']
-        )
-        querier = JobCBSAFromGeocodeQuerier(geocoder=geocoder, cbsa_finder=cbsa_finder)
-        return Geography(geo_querier=querier, **common_kwargs)
-
+        return cbsa_querier_property(common_kwargs)
 
 class StateOp(JobPostingComputedPropertyOperator):
     def computed_property(self, common_kwargs):
@@ -278,3 +312,19 @@ title_state_counts = TitleCountsByState(task_id='title_counts_by_state', dag=dag
 title_state_counts.set_upstream(state)
 title_state_counts.set_upstream(title_p1)
 title_state_counts.set_upstream(counts)
+
+cleaned_title_state_counts = CleanedTitleCountsByState(task_id='cleaned_title_counts_by_state', dag=dag)
+cleaned_title_state_counts.set_upstream(state)
+cleaned_title_state_counts.set_upstream(title_p2)
+cleaned_title_state_counts.set_upstream(counts)
+
+
+title_cbsa_counts = TitleCountsByCBSA(task_id='title_counts_by_cbsa', dag=dag)
+title_cbsa_counts.set_upstream(cbsa)
+title_cbsa_counts.set_upstream(title_p1)
+title_cbsa_counts.set_upstream(counts)
+
+cleaned_title_cbsa_counts = CleanedTitleCountsByCBSA(task_id='cleaned_title_counts_by_cbsa', dag=dag)
+cleaned_title_cbsa_counts.set_upstream(cbsa)
+cleaned_title_cbsa_counts.set_upstream(title_p2)
+cleaned_title_cbsa_counts.set_upstream(counts)
