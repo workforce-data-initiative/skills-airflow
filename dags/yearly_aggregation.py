@@ -106,7 +106,7 @@ class AggregateOperator(BaseOperator, YearlyJobPostingOperatorMixin):
                 lines.append(f'{column.name}: {column.description}')
         lines.append(' ')
         lines.append('Aggregate columns')
-        for agg in aggregate_properties:
+        for agg in aggregated_properties:
             for column in agg.property_columns:
                 for aggfunc in aggregate_functions.get(column.name, []):
                     funcname = base_func(aggfunc).__qualname__
@@ -123,6 +123,22 @@ class TitleCountsByState(AggregateOperator):
     def grouping_properties(self, common_kwargs):
         return [
             TitleCleanPhaseOne(**common_kwargs),
+            Geography(JobStateQuerier(), **common_kwargs)
+        ]
+
+    def aggregate_properties(self, common_kwargs):
+        return [PostingIdPresent(**common_kwargs)]
+
+    def aggregate_functions(self):
+        return {'posting_id_present': [numpy.sum]}
+
+
+class CleanedTitleCountsByState(AggregateOperator):
+    aggregation_name = 'cleaned_title_state_counts'
+
+    def grouping_properties(self, common_kwargs):
+        return [
+            TitleCleanPhaseTwo(**common_kwargs),
             Geography(JobStateQuerier(), **common_kwargs)
         ]
 
