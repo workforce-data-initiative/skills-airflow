@@ -102,12 +102,12 @@ class AggregateOperator(BaseOperator, YearlyJobPostingOperatorMixin):
         year, _ = datetime_to_year_quarter(context['execution_date'])
         common_kwargs = {'storage': self.storage(context)}
         grouping_properties = self.grouping_properties(common_kwargs)
-        aggregate_properties = self.aggregate_properties(common_kwargs)
+        aggregated_properties = self.aggregate_properties(common_kwargs)
         aggregate_functions = self.aggregate_functions()
         aggregate_path = aggregate_properties(
             out_filename=str(year),
             grouping_properties=grouping_properties,
-            aggregate_properties=aggregate_properties,
+            aggregate_properties=aggregated_properties,
             aggregate_functions=aggregate_functions,
             aggregation_name=self.aggregation_name,
             storage=self.aggregation_storage()
