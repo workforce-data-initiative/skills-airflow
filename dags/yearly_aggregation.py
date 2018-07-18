@@ -128,7 +128,7 @@ class AggregateOperator(BaseOperator, YearlyJobPostingOperatorMixin):
                     full_desc = desc + ' ' + column.description
                     lines.append(f'{column.name}: {full_desc}')
         readme_string = '\r'.join(lines)
-        self.aggregation_storage().write(readme_string.encode('utf-8'), 'README.txt')
+        self.aggregation_storage().write(readme_string.encode('utf-8'), f'{self.aggregation_name}/README.txt')
 
 
 class TitleCountsByState(AggregateOperator):
