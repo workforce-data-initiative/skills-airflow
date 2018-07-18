@@ -124,7 +124,7 @@ class AggregateOperator(BaseOperator, YearlyJobPostingOperatorMixin):
             for column in agg.property_columns:
                 for aggfunc in aggregate_functions.get(column.name, []):
                     funcname = base_func(aggfunc).__qualname__
-                    desc = next(desc for path, desc in column.compatible_aggregate_function_paths if funcname in path)
+                    desc = next(desc for path, desc in column.compatible_aggregate_function_paths.items() if funcname in path)
                     full_desc = desc + ' ' + column.description
                     lines.append(f'{column.name}: {full_desc}')
         readme_string = '\r'.join(lines)
