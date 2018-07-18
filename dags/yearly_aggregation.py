@@ -12,7 +12,7 @@ from skills_ml.job_postings.computed_properties.computers import (
     SkillCounts,
     PostingIdPresent
 )
-from skills_ml.job_postings.computed_properties.aggregators import aggregate_properties
+from skills_ml.job_postings.computed_properties.aggregators import aggregate_properties, base_func
 
 from skills_ml.algorithms.skill_extractors import (
     ExactMatchSkillExtractor,
