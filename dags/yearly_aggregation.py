@@ -268,8 +268,8 @@ class CBSAOp(JobPostingComputedPropertyOperator):
     def computed_property(self, common_kwargs):
         return cbsa_querier_property(common_kwargs)
 
-    def execute(self, context):
-        super().__init__(context)
+    def execute(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
         self.computed_property.geo_querier.geocoder.save()
 
 class StateOp(JobPostingComputedPropertyOperator):
