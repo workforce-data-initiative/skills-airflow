@@ -63,7 +63,8 @@ def cbsa_querier_property(common_kwargs):
     geocoding_storage = S3Store(config['geocoding']['s3_path'])
     geocoder = CachedGeocoder(
         cache_storage=geocoding_storage,
-        cache_fname=config['geocoding']['raw_filename']
+        cache_fname=config['geocoding']['raw_filename'],
+        autosave=False
     )
     cbsa_finder = CachedCBSAFinder(
         cache_storage=geocoding_storage,
@@ -266,6 +267,10 @@ class PostingIdPresentOp(JobPostingComputedPropertyOperator):
 class CBSAOp(JobPostingComputedPropertyOperator):
     def computed_property(self, common_kwargs):
         return cbsa_querier_property(common_kwargs)
+
+    def execute(self, context):
+        super().__init__(context)
+        self.computed_property.geo_querier.geocoder.save()
 
 class StateOp(JobPostingComputedPropertyOperator):
     def computed_property(self, common_kwargs):
