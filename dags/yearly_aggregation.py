@@ -132,6 +132,35 @@ class AggregateOperator(BaseOperator, YearlyJobPostingOperatorMixin):
         self.aggregation_storage().write(readme_string.encode('utf-8'), f'{self.aggregation_name}/README.txt')
 
 
+class GivenSocCounts(AggregateOperator):
+    aggregation_name = 'given_soc_counts'
+
+    def grouping_properties(self, common_kwargs):
+        return [GivenSoc(**common_kwargs)]
+
+    def aggregate_properties(self, common_kwargs):
+        return [PostingIdPresent(**common_kwargs)]
+
+    def aggregate_functions(self):
+        return {'posting_id_present': [numpy.sum]}
+
+
+class GivenSocCBSACounts(AggregateOperator):
+    aggregation_name = 'given_soc_cbsa_counts'
+
+    def grouping_properties(self, common_kwargs):
+        return [
+            GivenSoc(**common_kwargs),
+            cbsa_querier_property(common_kwargs)
+        ]
+
+    def aggregate_properties(self, common_kwargs):
+        return [PostingIdPresent(**common_kwargs)]
+
+    def aggregate_functions(self):
+        return {'posting_id_present': [numpy.sum]}
+
+
 class TitleCountsByState(AggregateOperator):
     aggregation_name = 'title_state_counts'
 
@@ -212,6 +241,11 @@ class TitleCleanPhaseOneOp(JobPostingComputedPropertyOperator):
 class TitleCleanPhaseTwoOp(JobPostingComputedPropertyOperator):
     def computed_property(self, common_kwargs):
         return TitleCleanPhaseTwo(**common_kwargs)
+
+
+class GivenSocOp(JobPostingComputedPropertyOperator):
+    def computed_property(self, common_kwargs):
+        return GivenSOC(**common_kwargs)
 
 
 #class ClassifyCommonOp(JobPostingComputedPropertyOperator):
@@ -304,6 +338,7 @@ title_p2 = TitleCleanPhaseTwoOp(task_id='title_clean_phase_two', dag=dag)
 #ClassifyCommon(task_id='soc_common', dag=dag)
 #ClassifyTop(task_id='soc_top', dag=dag)
 #ClassifyGiven(task_id='soc_given', dag=dag)
+given_soc = GivenSocOp(task_id='soc_code_given', dag=dag)
 comp_exact_onet = ExactMatchONETSkillCountsOp(task_id='skill_counts_exact_match_onet', dag=dag)
 comp_fuzzy_onet = FuzzyMatchONETSkillCountsOp(task_id='skill_counts_fuzzy_match_onet', dag=dag)
 comp_soc_onet = SocScopedExactMatchSkillCountsOp(task_id='skill_counts_exact_match_onet_soc_scoped', dag=dag)
@@ -333,3 +368,12 @@ cleaned_title_cbsa_counts = CleanedTitleCountsByCBSA(task_id='cleaned_title_coun
 cleaned_title_cbsa_counts.set_upstream(cbsa)
 cleaned_title_cbsa_counts.set_upstream(title_p2)
 cleaned_title_cbsa_counts.set_upstream(counts)
+
+soc_given_counts = GivenSocCounts(task_id='soc_given_counts', dag=dag)
+soc_given_counts.set_upstream(given_soc)
+soc_given_counts.set_upstream(counts)
+
+soc_given_cbsa_counts = GivenSocCBSACounts(task_id='soc_given_cbsa_counts', dag=dag)
+soc_given_cbsa_counts.set_upstream(given_soc)
+soc_given_cbsa_counts.set_upstream(cbsa)
+soc_given_cbsa_counts.set_upstream(counts)
