@@ -8,7 +8,7 @@ from skills_ml.job_postings.computed_properties.computers import (
     TitleCleanPhaseTwo,
     Geography,
     GivenSOC,
-    #SocClassifyProperty,
+    SOCClassifyProperty,
     SkillCounts,
     PostingIdPresent
 )
@@ -28,6 +28,7 @@ from skills_ml.algorithms.geocoders.cbsa import CachedCBSAFinder
 from skills_ml.job_postings.geography_queriers.cbsa import JobCBSAFromGeocodeQuerier
 from skills_ml.job_postings.geography_queriers.state import JobStateQuerier
 
+from skills_ml.algorithms.embedding.models import Doc2VecModel
 from skills_ml.algorithms.occupation_classifiers.classifiers import SocClassifier, KNNDoc2VecClassifier
 from airflow import DAG
 from skills_ml.storage import S3Store
@@ -249,10 +250,12 @@ class GivenSocOp(JobPostingComputedPropertyOperator):
         return GivenSOC(**common_kwargs)
 
 
-#class ClassifyCommonOp(JobPostingComputedPropertyOperator):
-    #def computed_property(self, common_kwargs):
-        #classifier = SocClassifier()
-        #return SocClassifyProperty(classifier, **common_kwargs)
+class ClassifyCommonOp(JobPostingComputedPropertyOperator):
+    def computed_property(self, common_kwargs):
+        storage = S3Store(config['embedding_models']['s3_path'])
+        embedding_model = Doc2VecModel.load(storage=storage, model_name=config['embedding_models']['gold_standard'])
+        classifier = KNNDoc2VecClassifier(embedding_model, k=10)
+        return SOCClassifyProperty(classifier, **common_kwargs)
 
 class ExactMatchONETSkillCountsOp(JobPostingComputedPropertyOperator):
     def computed_property(self, common_kwargs):
@@ -336,9 +339,7 @@ dag = DAG(
 )
 title_p1 = TitleCleanPhaseOneOp(task_id='title_clean_phase_one', dag=dag)
 title_p2 = TitleCleanPhaseTwoOp(task_id='title_clean_phase_two', dag=dag)
-#ClassifyCommon(task_id='soc_common', dag=dag)
-#ClassifyTop(task_id='soc_top', dag=dag)
-#ClassifyGiven(task_id='soc_given', dag=dag)
+common_soc = ClassifyCommonOp(task_id='soc_code_common', dag=dag)
 given_soc = GivenSocOp(task_id='soc_code_given', dag=dag)
 comp_exact_onet = ExactMatchONETSkillCountsOp(task_id='skill_counts_exact_match_onet', dag=dag)
 comp_fuzzy_onet = FuzzyMatchONETSkillCountsOp(task_id='skill_counts_fuzzy_match_onet', dag=dag)
