@@ -230,7 +230,8 @@ class JobPostingComputedPropertyOperator(BaseOperator, YearlyJobPostingOperatorM
             'storage': self.storage(context),
             'partition_func': partition_key,
         }
-        self.computed_property(common_kwargs).compute_on_collection(self.job_postings_generator(context))
+        self.computed_property_instance = self.computed_property(common_kwargs)
+        self.computed_property_instance.compute_on_collection(self.job_postings_generator(context))
 
 
 class TitleCleanPhaseOneOp(JobPostingComputedPropertyOperator):
@@ -304,7 +305,7 @@ class CBSAOp(JobPostingComputedPropertyOperator):
 
     def execute(self, *args, **kwargs):
         super().execute(*args, **kwargs)
-        self.computed_property.geo_querier.geocoder.save()
+        self.computed_property_instance.geo_querier.geocoder.save()
 
 class StateOp(JobPostingComputedPropertyOperator):
     def computed_property(self, common_kwargs):
