@@ -137,7 +137,7 @@ class GivenSocCounts(AggregateOperator):
     aggregation_name = 'given_soc_counts'
 
     def grouping_properties(self, common_kwargs):
-        return [GivenSoc(**common_kwargs)]
+        return [GivenSOC(**common_kwargs)]
 
     def aggregate_properties(self, common_kwargs):
         return [PostingIdPresent(**common_kwargs)]
@@ -151,7 +151,7 @@ class GivenSocCBSACounts(AggregateOperator):
 
     def grouping_properties(self, common_kwargs):
         return [
-            GivenSoc(**common_kwargs),
+            GivenSOC(**common_kwargs),
             cbsa_querier_property(common_kwargs)
         ]
 
