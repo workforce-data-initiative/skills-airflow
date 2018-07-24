@@ -6,7 +6,7 @@ from .models import SkillMaster
 
 
 def load_skills_master(storage, filename, db_engine):
-    reader = csv.DictReader(io.StringIO(storage.load(filename)), delimiter='\t')
+    reader = csv.DictReader(io.BytesIO(storage.load(filename)), delimiter='\t')
     session = sessionmaker(db_engine)()
     for row in reader:
         session.merge(SkillMaster(
