@@ -39,6 +39,7 @@ table_files = {
 
 storage = S3Store('open-skills-public/pipeline/tables')
 
+
 def full_path(filename):
     output_folder = os.environ.get('OUTPUT_FOLDER', None)
     if not output_folder:
@@ -49,7 +50,7 @@ def full_path(filename):
 class JobMaster(BaseOperator):
     def execute(self, context):
         engine = get_db()
-        load_jobs_master(full_path(table_files['jobs_master']), engine)
+        load_jobs_master(storage, table_files['jobs_master'], engine)
 
 
 class SkillMaster(BaseOperator):
@@ -61,19 +62,19 @@ class SkillMaster(BaseOperator):
 class JobAlternateTitles(BaseOperator):
     def execute(self, context):
         engine = get_db()
-        load_alternate_titles(full_path(table_files['jobs_master']), engine)
+        load_alternate_titles(storage, table_files['jobs_master'], engine)
 
 
 class JobUnusualTitles(BaseOperator):
     def execute(self, context):
         engine = get_db()
-        load_jobs_unusual_titles(full_path(table_files['interesting_jobs']), engine)
+        load_jobs_unusual_titles(storage, table_files['interesting_jobs'], engine)
 
 
 class SkillImportance(BaseOperator):
     def execute(self, context):
         engine = get_db()
-        load_skills_importance(full_path(table_files['skill_importance']), engine)
+        load_skills_importance(storage, table_files['skill_importance'], engine)
 
 
 class SchemaUpgrade(BaseOperator):
