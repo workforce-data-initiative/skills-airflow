@@ -10,6 +10,7 @@ from airflow.operators import BaseOperator
 
 from config import config
 from utils.db import get_apiv1_dbengine as get_db
+from skills_ml.storage import S3Store
 
 from api_sync.v1 import \
     load_jobs_master, \
@@ -36,6 +37,8 @@ table_files = {
 }
 
 
+storage = S3Store('open-skills-public/pipeline/tables')
+
 def full_path(filename):
     output_folder = os.environ.get('OUTPUT_FOLDER', None)
     if not output_folder:
@@ -52,7 +55,7 @@ class JobMaster(BaseOperator):
 class SkillMaster(BaseOperator):
     def execute(self, context):
         engine = get_db()
-        load_skills_master(full_path(table_files['skills_master']), engine)
+        load_skills_master(storage, table_files['skills_master'], engine)
 
 
 class JobAlternateTitles(BaseOperator):
