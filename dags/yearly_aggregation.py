@@ -13,7 +13,7 @@ from skills_ml.job_postings.computed_properties.computers import (
     PostingIdPresent
 )
 from skills_ml.job_postings.computed_properties.aggregators import aggregate_properties, base_func
-
+from skills_ml.job_postings.aggregate.pandas import listy_n_most_common
 from skills_ml.algorithms.skill_extractors import (
     ExactMatchSkillExtractor,
     FuzzyMatchSkillExtractor,
@@ -22,6 +22,7 @@ from skills_ml.algorithms.skill_extractors import (
     SocScopedExactMatchSkillExtractor
 )
 import numpy
+from functools import partial
 
 from skills_ml.algorithms.geocoders import CachedGeocoder
 from skills_ml.algorithms.geocoders.cbsa import CachedCBSAFinder
@@ -126,7 +127,7 @@ class AggregateOperator(BaseOperator, YearlyJobPostingOperatorMixin):
         year, _ = datetime_to_year_quarter(context['execution_date'])
         common_kwargs = self.common_kwargs(context)
         grouping_properties = [gp.computed_property(common_kwargs) for gp in grouping_operators]
-        aggregate_properties = [ap.computed_property(common_kwargs) for ap in aggregate_operators]
+        aggregated_properties = [ap.computed_property(common_kwargs) for ap in aggregate_operators]
         aggregate_functions = self.aggregate_functions
         aggregate_path = aggregate_properties(
             out_filename=str(year),
@@ -291,8 +292,11 @@ title_state_counts = AggregateOperator(
 title_cbsa_counts = AggregateOperator(
     aggregation_name='title_cbsa_counts',
     grouping_operators=[cbsa, title_p1],
-    aggregate_operators=[counts],
-    aggregate_functions={'posting_id_present': [numpy.sum]},
+    aggregate_operators=[counts, comp_soc_onet],
+    aggregate_functions={
+        'posting_id_present': [numpy.sum],
+        'skill_counts_exact_match_onet_scoped': [partial(listy_n_most_common, 10)]
+    },
     task_id='title_cbsa_counts',
     dag=dag
 )
@@ -300,8 +304,11 @@ title_cbsa_counts = AggregateOperator(
 cleaned_title_cbsa_counts = AggregateOperator(
     aggregation_name='cleaned_title_cbsa_counts',
     grouping_operators=[cbsa, title_p2],
-    aggregate_operators=[counts],
-    aggregate_functions={'posting_id_present': [numpy.sum]},
+    aggregate_operators=[counts, comp_soc_onet],
+    aggregate_functions={
+        'posting_id_present': [numpy.sum],
+        'skill_counts_exact_match_onet_scoped': [partial(listy_n_most_common, 10)]
+    },
     task_id='cleaned_title_cbsa_counts',
     dag=dag
 )
