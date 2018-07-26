@@ -13,7 +13,6 @@ from skills_ml.job_postings.computed_properties.computers import (
     PostingIdPresent
 )
 from skills_ml.job_postings.computed_properties.aggregators import aggregate_properties, base_func
-from skills_ml.job_postings.aggregate.pandas import listy_n_most_common
 from skills_ml.algorithms.skill_extractors import (
     ExactMatchSkillExtractor,
     FuzzyMatchSkillExtractor,
@@ -22,6 +21,7 @@ from skills_ml.algorithms.skill_extractors import (
     SocScopedExactMatchSkillExtractor
 )
 import numpy
+import skills_ml.job_postings.aggregate.pandas
 from functools import partial
 
 from skills_ml.algorithms.geocoders import CachedGeocoder
@@ -295,7 +295,7 @@ title_cbsa_counts = AggregateOperator(
     aggregate_operators=[counts, comp_soc_onet],
     aggregate_functions={
         'posting_id_present': [numpy.sum],
-        'skill_counts_exact_match_onet_scoped': [partial(listy_n_most_common, 10)]
+        'skill_counts_exact_match_onet_scoped': [partial(skills_ml.job_postings.aggregate.pandas.listy_n_most_common, 10)]
     },
     task_id='title_cbsa_counts',
     dag=dag
@@ -307,7 +307,7 @@ cleaned_title_cbsa_counts = AggregateOperator(
     aggregate_operators=[counts, comp_soc_onet],
     aggregate_functions={
         'posting_id_present': [numpy.sum],
-        'skill_counts_exact_match_onet_scoped': [partial(listy_n_most_common, 10)]
+        'skill_counts_exact_match_onet_scoped': [partial(skills_ml.job_postings.aggregate.pandas.listy_n_most_common, 10)]
     },
     task_id='cleaned_title_cbsa_counts',
     dag=dag
