@@ -93,19 +93,41 @@ class YearlyJobPostingOperatorMixin(object):
 
         return S3Store(f'{computed_properties_base_path}/{year}')
 
+    def common_kwargs(self, context):
+        return {
+            'storage': self.storage(context),
+            'partition_func': partition_key,
+        }
 
 
 class AggregateOperator(BaseOperator, YearlyJobPostingOperatorMixin):
+    def __init__(
+        self,
+        aggregation_name,
+        grouping_operators,
+        aggregate_operators,
+        aggregate_functions,
+        *args,
+        **kwargs
+    ):
+        super().__init__(*args, **kwargs)
+        self.aggregation_name = aggregation_name
+        self.grouping_operators = grouping_operators
+        self.aggregate_operators = aggregate_operators
+        self.set_upstream(self.grouping_operators)
+        self.set_upstream(self.aggregate_operators)
+        self.aggregate_functions = aggregate_functions
+
     def aggregation_storage(self):
         aggregations_base_path = config['job_posting_aggregations']['s3_path']
         return S3Store(aggregations_base_path)
 
     def execute(self, context):
         year, _ = datetime_to_year_quarter(context['execution_date'])
-        common_kwargs = {'storage': self.storage(context)}
-        grouping_properties = self.grouping_properties(common_kwargs)
-        aggregated_properties = self.aggregate_properties(common_kwargs)
-        aggregate_functions = self.aggregate_functions()
+        common_kwargs = self.common_kwargs(context)
+        grouping_properties = [gp.computed_property(common_kwargs) for gp in grouping_operators]
+        aggregate_properties = [ap.computed_property(common_kwargs) for ap in aggregate_operators]
+        aggregate_functions = self.aggregate_functions
         aggregate_path = aggregate_properties(
             out_filename=str(year),
             grouping_properties=grouping_properties,
@@ -133,104 +155,9 @@ class AggregateOperator(BaseOperator, YearlyJobPostingOperatorMixin):
         self.aggregation_storage().write(readme_string.encode('utf-8'), f'{self.aggregation_name}/README.txt')
 
 
-class GivenSocCounts(AggregateOperator):
-    aggregation_name = 'given_soc_counts'
-
-    def grouping_properties(self, common_kwargs):
-        return [GivenSOC(**common_kwargs)]
-
-    def aggregate_properties(self, common_kwargs):
-        return [PostingIdPresent(**common_kwargs)]
-
-    def aggregate_functions(self):
-        return {'posting_id_present': [numpy.sum]}
-
-
-class GivenSocCBSACounts(AggregateOperator):
-    aggregation_name = 'given_soc_cbsa_counts'
-
-    def grouping_properties(self, common_kwargs):
-        return [
-            GivenSOC(**common_kwargs),
-            cbsa_querier_property(common_kwargs)
-        ]
-
-    def aggregate_properties(self, common_kwargs):
-        return [PostingIdPresent(**common_kwargs)]
-
-    def aggregate_functions(self):
-        return {'posting_id_present': [numpy.sum]}
-
-
-class TitleCountsByState(AggregateOperator):
-    aggregation_name = 'title_state_counts'
-
-    def grouping_properties(self, common_kwargs):
-        return [
-            TitleCleanPhaseOne(**common_kwargs),
-            Geography(JobStateQuerier(), **common_kwargs)
-        ]
-
-    def aggregate_properties(self, common_kwargs):
-        return [PostingIdPresent(**common_kwargs)]
-
-    def aggregate_functions(self):
-        return {'posting_id_present': [numpy.sum]}
-
-
-class CleanedTitleCountsByState(AggregateOperator):
-    aggregation_name = 'cleaned_title_state_counts'
-
-    def grouping_properties(self, common_kwargs):
-        return [
-            TitleCleanPhaseTwo(**common_kwargs),
-            Geography(JobStateQuerier(), **common_kwargs)
-        ]
-
-    def aggregate_properties(self, common_kwargs):
-        return [PostingIdPresent(**common_kwargs)]
-
-    def aggregate_functions(self):
-        return {'posting_id_present': [numpy.sum]}
-
-
-class TitleCountsByCBSA(AggregateOperator):
-    aggregation_name = 'title_cbsa_counts'
-
-    def grouping_properties(self, common_kwargs):
-        return [
-            TitleCleanPhaseOne(**common_kwargs),
-            cbsa_querier_property(common_kwargs)
-        ]
-
-    def aggregate_properties(self, common_kwargs):
-        return [PostingIdPresent(**common_kwargs)]
-
-    def aggregate_functions(self):
-        return {'posting_id_present': [numpy.sum]}
-
-
-class CleanedTitleCountsByCBSA(AggregateOperator):
-    aggregation_name = 'cleaned_title_cbsa_counts'
-
-    def grouping_properties(self, common_kwargs):
-        return [
-            TitleCleanPhaseTwo(**common_kwargs),
-            cbsa_querier_property(common_kwargs)
-        ]
-
-    def aggregate_properties(self, common_kwargs):
-        return [PostingIdPresent(**common_kwargs)]
-
-    def aggregate_functions(self):
-        return {'posting_id_present': [numpy.sum]}
-
 class JobPostingComputedPropertyOperator(BaseOperator, YearlyJobPostingOperatorMixin):
     def execute(self, context):
-        common_kwargs = {
-            'storage': self.storage(context),
-            'partition_func': partition_key,
-        }
+        common_kwargs = self.common_kwargs(context)
         self.computed_property_instance = self.computed_property(common_kwargs)
         self.computed_property_instance.compute_on_collection(self.job_postings_generator(context))
 
@@ -350,32 +277,58 @@ counts = PostingIdPresentOp(task_id='posting_id_present', dag=dag)
 cbsa = CBSAOp(task_id='cbsa_from_geocode', dag=dag)
 state = StateOp(task_id='state', dag=dag)
 
-title_state_counts = TitleCountsByState(task_id='title_counts_by_state', dag=dag)
-title_state_counts.set_upstream(state)
-title_state_counts.set_upstream(title_p1)
-title_state_counts.set_upstream(counts)
 
-cleaned_title_state_counts = CleanedTitleCountsByState(task_id='cleaned_title_counts_by_state', dag=dag)
-cleaned_title_state_counts.set_upstream(state)
-cleaned_title_state_counts.set_upstream(title_p2)
-cleaned_title_state_counts.set_upstream(counts)
+title_state_counts = AggregateOperator(
+    aggregation_name='title_state_counts',
+    grouping_operators=[state, title_p1],
+    aggregate_operators=[counts],
+    aggregate_functions={'posting_id_present': [numpy.sum]},
+    task_id='title_state_counts',
+    dag=dag
+)
 
 
-title_cbsa_counts = TitleCountsByCBSA(task_id='title_counts_by_cbsa', dag=dag)
-title_cbsa_counts.set_upstream(cbsa)
-title_cbsa_counts.set_upstream(title_p1)
-title_cbsa_counts.set_upstream(counts)
+title_cbsa_counts = AggregateOperator(
+    aggregation_name='title_cbsa_counts',
+    grouping_operators=[cbsa, title_p1],
+    aggregate_operators=[counts],
+    aggregate_functions={'posting_id_present': [numpy.sum]},
+    task_id='title_cbsa_counts',
+    dag=dag
+)
 
-cleaned_title_cbsa_counts = CleanedTitleCountsByCBSA(task_id='cleaned_title_counts_by_cbsa', dag=dag)
-cleaned_title_cbsa_counts.set_upstream(cbsa)
-cleaned_title_cbsa_counts.set_upstream(title_p2)
-cleaned_title_cbsa_counts.set_upstream(counts)
+cleaned_title_cbsa_counts = AggregateOperator(
+    aggregation_name='cleaned_title_cbsa_counts',
+    grouping_operators=[cbsa, title_p2],
+    aggregate_operators=[counts],
+    aggregate_functions={'posting_id_present': [numpy.sum]},
+    task_id='cleaned_title_cbsa_counts',
+    dag=dag
+)
 
-soc_given_counts = GivenSocCounts(task_id='soc_given_counts', dag=dag)
-soc_given_counts.set_upstream(given_soc)
-soc_given_counts.set_upstream(counts)
+cleaned_title_state_counts = AggregateOperator(
+    aggregation_name='cleaned_title_state_counts',
+    grouping_operators=[state, title_p2],
+    aggregate_operators=[counts],
+    aggregate_functions={'posting_id_present': [numpy.sum]},
+    task_id='cleaned_title_state_counts',
+    dag=dag
+)
 
-soc_given_cbsa_counts = GivenSocCBSACounts(task_id='soc_given_cbsa_counts', dag=dag)
-soc_given_cbsa_counts.set_upstream(given_soc)
-soc_given_cbsa_counts.set_upstream(cbsa)
-soc_given_cbsa_counts.set_upstream(counts)
+soc_given_counts = AggregateOperator(
+    aggregation_name='given_soc_counts',
+    grouping_operators=[given_soc],
+    aggregate_operators=[counts],
+    aggregate_functions={'posting_id_present': [numpy.sum]},
+    task_id='soc_given_counts',
+    dag=dag
+)
+
+soc_given_cbsa_counts = AggregateOperator(
+    aggregation_name='given_soc_cbsa_counts',
+    grouping_operators=[given_soc, cbsa],
+    aggregate_operators=[counts],
+    aggregate_functions={'posting_id_present': [numpy.sum]},
+    task_id='soc_given_cbsa_counts',
+    dag=dag
+)

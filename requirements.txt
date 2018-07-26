@@ -3,5 +3,5 @@ joblib==0.11
 alembic==0.9.6
 s3fs
 
-git+git://github.com/workforce-data-initiative/skills-ml.git@new_import
+git+git://github.com/workforce-data-initiative/skills-ml.git@new_geocode
 git+git://github.com/workforce-data-initiative/skills-utils.git@master
