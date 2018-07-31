@@ -10,7 +10,9 @@ from skills_ml.job_postings.computed_properties.computers import (
     GivenSOC,
     SOCClassifyProperty,
     SkillCounts,
-    PostingIdPresent
+    PostingIdPresent,
+    HourlyPay,
+    YearlyPay
 )
 from skills_ml.job_postings.computed_properties.aggregators import aggregate_properties, base_func
 from skills_ml.algorithms.skill_extractors import (
@@ -173,6 +175,16 @@ class TitleCleanPhaseTwoOp(JobPostingComputedPropertyOperator):
         return TitleCleanPhaseTwo(**common_kwargs)
 
 
+class YearlyPayOp(JobPostingComputedPropertyOperator):
+    def computed_property(self, common_kwargs):
+        return YearlyPay(**common_kwargs)
+
+
+class HourlyPayOp(JobPostingComputedPropertyOperator):
+    def computed_property(self, common_kwargs):
+        return HourlyPay(**common_kwargs)
+
+
 class GivenSocOp(JobPostingComputedPropertyOperator):
     def computed_property(self, common_kwargs):
         return GivenSOC(**common_kwargs)
@@ -277,6 +289,8 @@ comp_ab = AbilityEndingSkillCountsOp(task_id='skill_counts_ability_ending', dag=
 counts = PostingIdPresentOp(task_id='posting_id_present', dag=dag)
 cbsa = CBSAOp(task_id='cbsa_from_geocode', dag=dag)
 state = StateOp(task_id='state', dag=dag)
+yearly_pay = YearlyPayOp(task_id='yearly_pay', dag=dag)
+hourly_pay = HourlyPayOp(task_id='hourly_pay', dag=dag)
 
 
 title_state_counts = AggregateOperator(
