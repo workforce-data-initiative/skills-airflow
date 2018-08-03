@@ -22,6 +22,7 @@ from skills_ml.algorithms.skill_extractors import (
     AbilityEndingPatternExtractor,
     SocScopedExactMatchSkillExtractor
 )
+from skills_ml.ontologies.onet import ONET
 import numpy
 from skills_ml.job_postings.aggregate.pandas import listy_n_most_common
 from functools import partial
@@ -199,31 +200,19 @@ class ClassifyCommonOp(JobPostingComputedPropertyOperator):
 
 class ExactMatchONETSkillCountsOp(JobPostingComputedPropertyOperator):
     def computed_property(self, common_kwargs):
-        skill_extractor = ExactMatchSkillExtractor(
-            skill_lookup_path=config['skill_sources']['onet_ksat'],
-            skill_lookup_name='onet_ksat',
-            skill_lookup_description='ONET Knowledge, Skills, Abilities, Tools, and Technology'
-        )
+        skill_extractor = ExactMatchSkillExtractor(competency_framework=ONET().competency_framework)
         return SkillCounts(skill_extractor, **common_kwargs)
 
 
 class FuzzyMatchONETSkillCountsOp(JobPostingComputedPropertyOperator):
     def computed_property(self, common_kwargs):
-        skill_extractor = FuzzyMatchSkillExtractor(
-            skill_lookup_path=config['skill_sources']['onet_ksat'],
-            skill_lookup_name='onet_ksat',
-            skill_lookup_description='ONET Knowledge, Skills, Abilities, Tools, and Technology'
-        )
+        skill_extractor = FuzzyMatchSkillExtractor(competency_framework=ONET().competency_framework)
         return SkillCounts(skill_extractor, **common_kwargs)
 
 
 class SocScopedExactMatchSkillCountsOp(JobPostingComputedPropertyOperator):
     def computed_property(self, common_kwargs):
-        skill_extractor = SocScopedExactMatchSkillExtractor(
-            skill_lookup_path=config['skill_sources']['onet_ksat_with_soc'],
-            skill_lookup_name='onet_ksat',
-            skill_lookup_description='ONET Knowledge, Skills, Abilities, Tools, and Technology'
-        )
+        skill_extractor = SocScopedExactMatchSkillExtractor(competency_ontology=ONET())
         return SkillCounts(skill_extractor, **common_kwargs)
 
 class SkillEndingSkillCountsOp(JobPostingComputedPropertyOperator):
