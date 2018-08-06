@@ -14,7 +14,10 @@ from skills_ml.job_postings.computed_properties.computers import (
     HourlyPay,
     YearlyPay
 )
-from skills_ml.job_postings.computed_properties.aggregators import aggregate_properties, base_func
+from skills_ml.job_postings.computed_properties.aggregators import (
+    aggregate_properties,
+    base_func
+)
 from skills_ml.algorithms.skill_extractors import (
     ExactMatchSkillExtractor,
     FuzzyMatchSkillExtractor,
@@ -33,7 +36,7 @@ from skills_ml.job_postings.geography_queriers.cbsa import JobCBSAFromGeocodeQue
 from skills_ml.job_postings.geography_queriers.state import JobStateQuerier
 
 from skills_ml.algorithms.embedding.models import Doc2VecModel
-from skills_ml.algorithms.occupation_classifiers.classifiers import SocClassifier, KNNDoc2VecClassifier
+from skills_ml.algorithms.occupation_classifiers.classifiers import KNNDoc2VecClassifier
 from airflow import DAG
 from skills_ml.storage import S3Store
 from airflow.operators import BaseOperator
@@ -47,21 +50,6 @@ def partition_key(transformed_document):
         logging.warning('No partition key available! Choosing fallback')
         partition_key = '-1'
     return partition_key
-
-# compute step:
-# for path in job posting paths:
-#   grab all individual s3 files under path using a prefix search
-#   for each file, spawn multiprocessing worker that:
-#       create JobPostingCollection for individual file
-#       create storage object with computed_properties_base_path/year/filename
-#       create computed property with storage object and partition key of static '0' (the partition is the file, no need for further partitioning)
-#       compute on job posting collection
-#
-# aggregation step:
-# for each property type:
-#   create storage object with computed_properties_base_path/year
-#   create computed property with storage object. partition func doesn't matter as we don't do any computing
-# call aggregation with all computed property objects
 
 
 def cbsa_querier_property(common_kwargs):
@@ -129,10 +117,16 @@ class AggregateOperator(BaseOperator, YearlyJobPostingOperatorMixin):
     def execute(self, context):
         year, _ = datetime_to_year_quarter(context['execution_date'])
         common_kwargs = self.common_kwargs(context)
-        grouping_properties = [gp.computed_property(common_kwargs) for gp in self.grouping_operators]
-        aggregated_properties = [ap.computed_property(common_kwargs) for ap in self.aggregate_operators]
+        grouping_properties = [
+            gp.computed_property(common_kwargs)
+            for gp in self.grouping_operators
+        ]
+        aggregated_properties = [
+            ap.computed_property(common_kwargs)
+            for ap in self.aggregate_operators
+        ]
         aggregate_functions = self.aggregate_functions
-        aggregate_path = aggregate_properties(
+        aggregate_properties(
             out_filename=str(year),
             grouping_properties=grouping_properties,
             aggregate_properties=aggregated_properties,
@@ -152,11 +146,18 @@ class AggregateOperator(BaseOperator, YearlyJobPostingOperatorMixin):
             for column in agg.property_columns:
                 for aggfunc in aggregate_functions.get(column.name, []):
                     funcname = base_func(aggfunc).__qualname__
-                    desc = next(desc for path, desc in column.compatible_aggregate_function_paths.items() if funcname in path)
+                    desc = next(
+                        desc for path, desc
+                        in column.compatible_aggregate_function_paths.items()
+                        if funcname in path
+                    )
                     full_desc = desc + ' ' + column.description
                     lines.append(f'{column.name}: {full_desc}')
         readme_string = '\r'.join(lines)
-        self.aggregation_storage().write(readme_string.encode('utf-8'), f'{self.aggregation_name}/README.txt')
+        self.aggregation_storage().write(
+            readme_string.encode('utf-8'),
+            f'{self.aggregation_name}/README.txt'
+        )
 
 
 class JobPostingComputedPropertyOperator(BaseOperator, YearlyJobPostingOperatorMixin):
@@ -194,9 +195,13 @@ class GivenSocOp(JobPostingComputedPropertyOperator):
 class ClassifyCommonOp(JobPostingComputedPropertyOperator):
     def computed_property(self, common_kwargs):
         storage = S3Store(config['embedding_models']['s3_path'])
-        embedding_model = Doc2VecModel.load(storage=storage, model_name=config['embedding_models']['gold_standard'])
+        embedding_model = Doc2VecModel.load(
+            storage=storage,
+            model_name=config['embedding_models']['gold_standard']
+        )
         classifier = KNNDoc2VecClassifier(embedding_model, k=10)
         return SOCClassifyProperty(classifier, **common_kwargs)
+
 
 class ExactMatchONETSkillCountsOp(JobPostingComputedPropertyOperator):
     def computed_property(self, common_kwargs):
@@ -215,6 +220,7 @@ class SocScopedExactMatchSkillCountsOp(JobPostingComputedPropertyOperator):
         skill_extractor = SocScopedExactMatchSkillExtractor(competency_ontology=ONET())
         return SkillCounts(skill_extractor, **common_kwargs)
 
+
 class SkillEndingSkillCountsOp(JobPostingComputedPropertyOperator):
     def computed_property(self, common_kwargs):
         skill_extractor = SkillEndingPatternExtractor()
@@ -231,6 +237,7 @@ class PostingIdPresentOp(JobPostingComputedPropertyOperator):
     def computed_property(self, common_kwargs):
         return PostingIdPresent(**common_kwargs)
 
+
 class CBSAOp(JobPostingComputedPropertyOperator):
     def computed_property(self, common_kwargs):
         return cbsa_querier_property(common_kwargs)
@@ -238,6 +245,7 @@ class CBSAOp(JobPostingComputedPropertyOperator):
     def execute(self, *args, **kwargs):
         super().execute(*args, **kwargs)
         self.computed_property_instance.geo_querier.geocoder.save()
+
 
 class StateOp(JobPostingComputedPropertyOperator):
     def computed_property(self, common_kwargs):
@@ -254,11 +262,6 @@ default_args = {
     'email_on_retry': False,
     'retries': 1,
     'retry_delay': timedelta(minutes=5),
-    #'schedule_interval': '@yearly',
-    # 'queue': 'bash_queue',
-    # 'pool': 'backfill',
-    # 'priority_weight': 10,
-    # 'end_date': datetime(2016, 1, 1),
 }
 
 dag = DAG(
@@ -272,7 +275,10 @@ common_soc = ClassifyCommonOp(task_id='soc_code_common', dag=dag)
 given_soc = GivenSocOp(task_id='soc_code_given', dag=dag)
 comp_exact_onet = ExactMatchONETSkillCountsOp(task_id='skill_counts_exact_match_onet', dag=dag)
 comp_fuzzy_onet = FuzzyMatchONETSkillCountsOp(task_id='skill_counts_fuzzy_match_onet', dag=dag)
-comp_soc_onet = SocScopedExactMatchSkillCountsOp(task_id='skill_counts_exact_match_onet_soc_scoped', dag=dag)
+comp_soc_onet = SocScopedExactMatchSkillCountsOp(
+    task_id='skill_counts_exact_match_onet_soc_scoped',
+    dag=dag
+)
 comp_skill = SkillEndingSkillCountsOp(task_id='skill_counts_skill_ending', dag=dag)
 comp_ab = AbilityEndingSkillCountsOp(task_id='skill_counts_ability_ending', dag=dag)
 counts = PostingIdPresentOp(task_id='posting_id_present', dag=dag)
@@ -295,10 +301,12 @@ title_state_counts = AggregateOperator(
 title_cbsa_counts = AggregateOperator(
     aggregation_name='title_cbsa_counts',
     grouping_operators=[cbsa, title_p1],
-    aggregate_operators=[counts, comp_soc_onet],
+    aggregate_operators=[counts, comp_soc_onet, yearly_pay, hourly_pay],
     aggregate_functions={
         'posting_id_present': [numpy.sum],
-        'skill_counts_onet_ksat_occscoped_exact_match': [partial(listy_n_most_common, 10)]
+        'skill_counts_onet_ksat_occscoped_exact_match': [partial(listy_n_most_common, 10)],
+        'yearly_pay': [numpy.mean, numpy.median],
+        'hourly_pay': [numpy.mean, numpy.median],
     },
     task_id='title_cbsa_counts',
     dag=dag
@@ -307,10 +315,12 @@ title_cbsa_counts = AggregateOperator(
 cleaned_title_cbsa_counts = AggregateOperator(
     aggregation_name='cleaned_title_cbsa_counts',
     grouping_operators=[cbsa, title_p2],
-    aggregate_operators=[counts, comp_soc_onet],
+    aggregate_operators=[counts, comp_soc_onet, yearly_pay, hourly_pay],
     aggregate_functions={
         'posting_id_present': [numpy.sum],
-        'skill_counts_onet_ksat_occscoped_exact_match': [partial(listy_n_most_common, 10)]
+        'skill_counts_onet_ksat_occscoped_exact_match': [partial(listy_n_most_common, 10)],
+        'yearly_pay': [numpy.mean, numpy.median],
+        'hourly_pay': [numpy.mean, numpy.median],
     },
     task_id='cleaned_title_cbsa_counts',
     dag=dag
