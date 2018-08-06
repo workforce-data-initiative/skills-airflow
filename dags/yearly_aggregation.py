@@ -25,7 +25,7 @@ from skills_ml.algorithms.skill_extractors import (
     AbilityEndingPatternExtractor,
     SocScopedExactMatchSkillExtractor
 )
-from skills_ml.ontologies.onet import ONET
+from skills_ml.ontologies.onet import Onet
 import numpy
 from skills_ml.job_postings.aggregate.pandas import listy_n_most_common
 from functools import partial
@@ -205,19 +205,19 @@ class ClassifyCommonOp(JobPostingComputedPropertyOperator):
 
 class ExactMatchONETSkillCountsOp(JobPostingComputedPropertyOperator):
     def computed_property(self, common_kwargs):
-        skill_extractor = ExactMatchSkillExtractor(competency_framework=ONET().competency_framework)
+        skill_extractor = ExactMatchSkillExtractor(competency_framework=Onet().competency_framework)
         return SkillCounts(skill_extractor, **common_kwargs)
 
 
 class FuzzyMatchONETSkillCountsOp(JobPostingComputedPropertyOperator):
     def computed_property(self, common_kwargs):
-        skill_extractor = FuzzyMatchSkillExtractor(competency_framework=ONET().competency_framework)
+        skill_extractor = FuzzyMatchSkillExtractor(competency_framework=Onet().competency_framework)
         return SkillCounts(skill_extractor, **common_kwargs)
 
 
 class SocScopedExactMatchSkillCountsOp(JobPostingComputedPropertyOperator):
     def computed_property(self, common_kwargs):
-        skill_extractor = SocScopedExactMatchSkillExtractor(competency_ontology=ONET())
+        skill_extractor = SocScopedExactMatchSkillExtractor(competency_ontology=Onet())
         return SkillCounts(skill_extractor, **common_kwargs)
 
 
