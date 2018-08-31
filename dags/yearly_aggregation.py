@@ -305,8 +305,8 @@ title_cbsa_counts = AggregateOperator(
     aggregate_functions={
         'posting_id_present': [numpy.sum],
         'skill_counts_onet_ksat_occscoped_exact_match': [partial(listy_n_most_common, 10)],
-        'yearly_pay': [numpy.mean, numpy.median],
-        'hourly_pay': [numpy.mean, numpy.median],
+        'pay_yearly': [numpy.mean, numpy.median],
+        'pay_hourly': [numpy.mean, numpy.median],
     },
     task_id='title_cbsa_counts',
     dag=dag
@@ -319,8 +319,8 @@ cleaned_title_cbsa_counts = AggregateOperator(
     aggregate_functions={
         'posting_id_present': [numpy.sum],
         'skill_counts_onet_ksat_occscoped_exact_match': [partial(listy_n_most_common, 10)],
-        'yearly_pay': [numpy.mean, numpy.median],
-        'hourly_pay': [numpy.mean, numpy.median],
+        'pay_yearly': [numpy.mean, numpy.median],
+        'pay_hourly': [numpy.mean, numpy.median],
     },
     task_id='cleaned_title_cbsa_counts',
     dag=dag
