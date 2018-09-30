@@ -221,6 +221,12 @@ class SocScopedExactMatchSkillCountsOp(JobPostingComputedPropertyOperator):
         return SkillCounts(skill_extractor, **common_kwargs)
 
 
+class ExactMatchONETSkillCountsOp(JobPostingComputedPropertyOperator):
+    def computed_property(self, common_kwargs):
+        skill_extractor = ExactMatchSkillExtractor(competency_framework=Onet().competency_framework)
+        return SkillCounts(skill_extractor, **common_kwargs)
+
+
 class SkillEndingSkillCountsOp(JobPostingComputedPropertyOperator):
     def computed_property(self, common_kwargs):
         skill_extractor = SkillEndingPatternExtractor()
@@ -350,5 +356,55 @@ soc_given_cbsa_counts = AggregateOperator(
     aggregate_operators=[counts],
     aggregate_functions={'posting_id_present': [numpy.sum]},
     task_id='soc_given_cbsa_counts',
+    dag=dag
+)
+
+
+soc_cbsa_exact_match_onet = AggregateOperator(
+    aggregation_name='soc_cbsa_skill_counts_exact_match_onet',
+    grouping_operators=[given_soc, cbsa],
+    aggregate_operators=[comp_exact_onet, counts],
+    aggregate_functions={
+        'skill_counts_onet_ksat_exact_match': [partial(listy_n_most_common, 20)],
+        'posting_id_present': [numpy.sum],
+    },
+    task_id='soc_cbsa_exact_match_onet',
+    dag=dag
+)
+
+soc_cbsa_fuzzy_match_onet = AggregateOperator(
+    aggregation_name='soc_cbsa_skill_counts_fuzzy_match_onet',
+    grouping_operators=[given_soc, cbsa],
+    aggregate_operators=[comp_fuzzy_onet, counts],
+    aggregate_functions={
+        'skill_counts_onet_ksat_fuzzy_88': [partial(listy_n_most_common, 20)],
+        'posting_id_present': [numpy.sum],
+    },
+    task_id='soc_cbsa_fuzzy_match_onet',
+    dag=dag
+)
+
+soc_cbsa_skill_phrase = AggregateOperator(
+    aggregation_name='soc_cbsa_noun_phrase_skill_bulleted',
+    grouping_operators=[given_soc, cbsa],
+    aggregate_operators=[comp_skill, counts],
+    aggregate_functions={
+        'skill_counts_noun_phrase_skill_bulleted': [partial(listy_n_most_common, 20)],
+        'posting_id_present': [numpy.sum],
+    },
+    task_id='soc_cbsa_skill_phrase',
+    dag=dag
+)
+
+
+soc_cbsa_ability_phrase = AggregateOperator(
+    aggregation_name='soc_cbsa_noun_phrase_ability_bulleted',
+    grouping_operators=[given_soc, cbsa],
+    aggregate_operators=[comp_ab, counts],
+    aggregate_functions={
+        'skill_counts_noun_phrase_ability_bulleted': [partial(listy_n_most_common, 20)],
+        'posting_id_present': [numpy.sum],
+    },
+    task_id='soc_cbsa_ability_phrase',
     dag=dag
 )
