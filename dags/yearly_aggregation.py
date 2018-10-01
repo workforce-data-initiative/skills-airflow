@@ -211,6 +211,8 @@ class ExactMatchESCOSkillCountsOp(JobPostingComputedPropertyOperator):
         esco.name = 'esco'
         esco.competency_framework.name = 'esco'
         esco.competency_framework.description = 'ESCO skills and competences'
+        skill_extractor = ExactMatchSkillExtractor(competency_framework=esco.competency_framework)
+        return SkillCounts(skill_extractor, **common_kwargs)
 
 
 class ExactMatchONETSkillCountsOp(JobPostingComputedPropertyOperator):
