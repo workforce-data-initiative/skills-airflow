@@ -26,6 +26,7 @@ from skills_ml.algorithms.skill_extractors import (
     SocScopedExactMatchSkillExtractor
 )
 from skills_ml.ontologies.onet import Onet
+from skills_ml.ontologies.base import CompetencyOntology
 import numpy
 from skills_ml.job_postings.aggregate.pandas import listy_n_most_common
 from functools import partial
@@ -203,6 +204,15 @@ class ClassifyCommonOp(JobPostingComputedPropertyOperator):
         return SOCClassifyProperty(classifier, **common_kwargs)
 
 
+class ExactMatchESCOSkillCountsOp(JobPostingComputedPropertyOperator):
+    def computed_property(self, common_kwargs):
+        ontology_storage = S3Store(config['ontologies']['s3_path'])
+        esco = CompetencyOntology.from_jsonld(ontology_storage.load('esco.json'))
+        esco.name = 'esco'
+        esco.competency_framework.name = 'esco'
+        esco.competency_framework.description = 'ESCO skills and competences'
+
+
 class ExactMatchONETSkillCountsOp(JobPostingComputedPropertyOperator):
     def computed_property(self, common_kwargs):
         skill_extractor = ExactMatchSkillExtractor(competency_framework=Onet().competency_framework)
@@ -218,12 +228,6 @@ class FuzzyMatchONETSkillCountsOp(JobPostingComputedPropertyOperator):
 class SocScopedExactMatchSkillCountsOp(JobPostingComputedPropertyOperator):
     def computed_property(self, common_kwargs):
         skill_extractor = SocScopedExactMatchSkillExtractor(competency_ontology=Onet())
-        return SkillCounts(skill_extractor, **common_kwargs)
-
-
-class ExactMatchONETSkillCountsOp(JobPostingComputedPropertyOperator):
-    def computed_property(self, common_kwargs):
-        skill_extractor = ExactMatchSkillExtractor(competency_framework=Onet().competency_framework)
         return SkillCounts(skill_extractor, **common_kwargs)
 
 
@@ -279,6 +283,7 @@ title_p1 = TitleCleanPhaseOneOp(task_id='title_clean_phase_one', dag=dag)
 title_p2 = TitleCleanPhaseTwoOp(task_id='title_clean_phase_two', dag=dag)
 common_soc = ClassifyCommonOp(task_id='soc_code_common', dag=dag)
 given_soc = GivenSocOp(task_id='soc_code_given', dag=dag)
+comp_exact_esco = ExactMatchESCOSkillCountsOp(task_id='skill_counts_exact_match_esco', dag=dag)
 comp_exact_onet = ExactMatchONETSkillCountsOp(task_id='skill_counts_exact_match_onet', dag=dag)
 comp_fuzzy_onet = FuzzyMatchONETSkillCountsOp(task_id='skill_counts_fuzzy_match_onet', dag=dag)
 comp_soc_onet = SocScopedExactMatchSkillCountsOp(
@@ -356,6 +361,19 @@ soc_given_cbsa_counts = AggregateOperator(
     aggregate_operators=[counts],
     aggregate_functions={'posting_id_present': [numpy.sum]},
     task_id='soc_given_cbsa_counts',
+    dag=dag
+)
+
+
+soc_cbsa_exact_match_esco = AggregateOperator(
+    aggregation_name='soc_cbsa_skill_counts_exact_match_esco',
+    grouping_operators=[given_soc, cbsa],
+    aggregate_operators=[comp_exact_esco, counts],
+    aggregate_functions={
+        'skill_counts_esco_ksat_exact_match': [partial(listy_n_most_common, 20)],
+        'posting_id_present': [numpy.sum],
+    },
+    task_id='soc_cbsa_exact_match_esco',
     dag=dag
 )
 
